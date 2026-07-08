@@ -1,1 +1,8 @@
-
+{
+  "name": "scale-builders",
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0"
+  }
+}
