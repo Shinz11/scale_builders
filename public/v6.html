@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Soundscape Curve — Microtonal Scale Builder</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-deep:    #080808;
+    --bg-panel:   #101010;
+    --bg-card:    #161616;
+    --border:     #2a2a2a;
+    --emerald:    #d6d6d6;
+    --emerald-dim: #a8a8a8;
+    --emerald-glow: rgba(210, 210, 210, 0.18);
+    --amber:      #f0f0f0;
+    --text-hi:    #f0f0f0;
+    --text-mid:   #8a8a8a;
+    --text-lo:    #5a5a5a;
+    --node-r:     9;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg-deep);
+    color: var(--text-hi);
+    font-family: 'Inter', system-ui, sans-serif;
+    user-select: none;
+    overflow: hidden;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    min-height: 100vh;
+    padding: 0 16px;
+  }
+
+  /* ── Header ── */
+  header {
+    width: 100%;
+    max-width: 960px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 18px 0 10px;
+    flex-shrink: 0;
+  }
+
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .brand-title {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--emerald);
+    filter: drop-shadow(0 0 8px rgba(210,210,210,0.28));
+  }
+
+  .brand-sub {
+    font-size: 11px;
+    font-weight: 300;
+    color: var(--text-mid);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ── Canvas wrapper ── */
+  .canvas-wrap {
+    position: relative;
+    width: 100%;
+    max-width: 960px;
+    flex: 1 1 auto;
+    min-height: 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--bg-panel);
+    box-shadow:
+      0 0 0 1px rgba(210,210,210,0.05),
+      0 8px 40px rgba(0,0,0,0.6),
+      inset 0 1px 0 rgba(255,255,255,0.03);
+    cursor: crosshair;
+  }
+
+  #svg-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ── Tooltip ── */
+  #tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: rgba(16,16,16,0.92);
+    border: 1px solid var(--emerald-dim);
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--emerald);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.12s;
+    z-index: 100;
+    backdrop-filter: blur(6px);
+  }
+  #tooltip.show { opacity: 1; }
+
+  /* ── Controls ── */
+  .controls {
+    width: 100%;
+    max-width: 960px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0 6px;
+    flex-shrink: 0;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-hi);
+    font-size: 13px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s;
+  }
+
+  .btn:hover {
+    background: #222222;
+    border-color: #444444;
+  }
+
+  .btn-primary {
+    border-color: var(--emerald-dim);
+    color: var(--emerald);
+    box-shadow: 0 0 0 0 var(--emerald-glow);
+  }
+
+  .btn-primary:hover {
+    background: rgba(210,210,210,0.08);
+    border-color: var(--emerald);
+    box-shadow: 0 0 14px var(--emerald-glow);
+    color: var(--emerald);
+  }
+
+  .btn-primary.active {
+    background: rgba(210,210,210,0.12);
+    border-color: var(--emerald);
+    box-shadow: 0 0 20px var(--emerald-glow);
+    color: var(--emerald);
+  }
+
+  .btn-danger {
+    border-color: #4a4a4a;
+    color: #b8b8b8;
+  }
+
+  .btn-danger:hover {
+    background: rgba(210,210,210,0.08);
+    border-color: #8a8a8a;
+    color: #eeeeee;
+  }
+
+  .note-count {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-mid);
+    letter-spacing: 0.04em;
+  }
+  .note-count span {
+    color: var(--emerald);
+    font-weight: 600;
+  }
+
+  /* ── Footer hint ── */
+  footer {
+    width: 100%;
+    max-width: 960px;
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding: 6px 0 14px;
+    flex-shrink: 0;
+  }
+
+  .hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-lo);
+    letter-spacing: 0.04em;
+  }
+
+  .hint-icon {
+    width: 14px;
+    height: 14px;
+    opacity: 0.45;
+  }
+
+  /* SVG elements */
+  .grid-line { stroke: rgba(255,255,255,0.04); stroke-width: 1; }
+  .grid-label {
+    fill: rgba(255,255,255,0.1);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.04em;
+  }
+
+  .curve-path {
+    fill: none;
+    stroke: var(--emerald);
+    stroke-width: 2.2;
+    filter: drop-shadow(0 0 5px rgba(220,220,220,0.42));
+  }
+
+  .fill-path {
+    /* gradient defined inline */
+  }
+
+  .node-circle {
+    fill: var(--bg-panel);
+    stroke: var(--emerald);
+    stroke-width: 2;
+    cursor: grab;
+    transition: r 0.1s;
+    filter: drop-shadow(0 0 6px rgba(220,220,220,0.55));
+  }
+
+  .node-circle:hover, .node-circle.dragging {
+    fill: var(--emerald-glow);
+    filter: drop-shadow(0 0 12px rgba(230,230,230,0.8));
+  }
+
+  .node-circle.playing {
+    fill: var(--amber);
+    stroke: var(--amber);
+    filter: drop-shadow(0 0 16px rgba(245,245,245,0.85));
+  }
+
+  .node-circle.base-node {
+    fill: var(--bg-panel);
+    stroke: var(--amber);
+    cursor: default;
+    filter: drop-shadow(0 0 10px rgba(235,235,235,0.65));
+  }
+
+  .node-circle.base-node:hover {
+    fill: rgba(230,230,230,0.12);
+    filter: drop-shadow(0 0 14px rgba(245,245,245,0.75));
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="brand-title">Soundscape Curve</span>
+    <span class="brand-sub">音階作成システム  v0.3</span>
+  </div>
+</header>
+
+<div class="canvas-wrap" id="canvas-wrap">
+  <svg id="svg-canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+</div>
+
+<div class="controls">
+  <button class="btn btn-primary" id="btn-play-asc">▲ 上昇再生</button>
+  <button class="btn btn-primary" id="btn-play-desc">▼ 下降再生</button>
+  <button class="btn" id="btn-stop" disabled>■ 停止</button>
+  <button class="btn btn-danger" id="btn-reset">
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 6.5a4.5 4.5 0 1 1 1.2 3"/><polyline points="2,10 2,6.5 5.5,6.5"/></svg>
+    リセット
+  </button>
+  <button class="btn btn-primary" id="btn-finish">完成</button>
+  <div class="note-count">ノード: <span id="node-count">1</span></div>
+</div>
+
+<footer>
+  <div class="hint">
+    <svg class="hint-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><line x1="7" y1="4" x2="7" y2="7.5"/><circle cx="7" cy="9.5" r="0.6" fill="currentColor"/></svg>
+    クリックで音を追加
+  </div>
+  <div class="hint">
+    <svg class="hint-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="7" y1="1" x2="7" y2="13"/><polyline points="4,4 7,1 10,4"/><polyline points="4,10 7,13 10,10"/></svg>
+    上下ドラッグで音高を調整（1 cent単位）
+  </div>
+  <div class="hint">
+    <svg class="hint-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><line x1="7" y1="4.5" x2="7" y2="8"/><line x1="5.5" y1="8" x2="8.5" y2="8"/></svg>
+    縦軸: 0–1200 cent（12平均律1オクターブ相当）
+  </div>
+</footer>
+
+<div id="tooltip"></div>
+
+<script>
+(() => {
+  /* ───────── state ───────── */
+  const nodes = []; // { id, cent, isBase }  — sorted left→right by insertion order
+  let dragging = null; // { id, startY, startCent }
+  let playTimeout = null;
+  let isPlaying = false;
+  let playbackQueue = [];
+  let currentPlaybackMode = null;
+  let nextId = 0;
+  let audioCtx = null;
+  let dragOsc = null;
+  let dragGain = null;
+
+  const CENT_MIN = 0;
+  const CENT_MAX = 1200;
+  const ROOT_HZ  = 261.63;
+  const NOTE_DUR = 0.5; // seconds per note in sequence
+  const SOLO_DUR = 0.55; // single note audition
+  const NODE_X_GAP = 90; // ノードを左から順に並べる基本間隔
+  const SHOW_CENT_VALUES = true; // 開発時は true、実験時は false にする
+
+  /* ───────── DOM refs ───────── */
+  const wrap    = document.getElementById('canvas-wrap');
+  const svg     = document.getElementById('svg-canvas');
+  const tooltip = document.getElementById('tooltip');
+  const btnPlayAsc = document.getElementById('btn-play-asc');
+  const btnPlayDesc = document.getElementById('btn-play-desc');
+  const btnStop = document.getElementById('btn-stop');
+  const btnReset= document.getElementById('btn-reset');
+  const btnFinish = document.getElementById('btn-finish');
+  const cntEl   = document.getElementById('node-count');
+
+  /* ───────── SVG helpers ───────── */
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs={}) => {
+    const e = document.createElementNS(NS, tag);
+    for (const [k,v] of Object.entries(attrs)) e.setAttribute(k, v);
+    return e;
+  };
+
+  /* ───────── Audio ───────── */
+  function getCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function playTone(cent, duration = 0.55, startTime = 0, volume = 0.22) {
+    const ctx = getCtx();
+    const t = startTime || ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(centToHz(cent), t);
+
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(volume, t + 0.012);
+    gain.gain.setValueAtTime(volume, t + duration * 0.55);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + duration + 0.02);
+
+    return osc;
+  }
+
+  function startDragTone(cent) {
+    const ctx = getCtx();
+    stopDragTone();
+
+    dragOsc = ctx.createOscillator();
+    dragGain = ctx.createGain();
+
+    dragOsc.type = 'triangle';
+    dragOsc.frequency.setValueAtTime(centToHz(cent), ctx.currentTime);
+
+    dragGain.gain.setValueAtTime(0.001, ctx.currentTime);
+    dragGain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 0.02);
+
+    dragOsc.connect(dragGain);
+    dragGain.connect(ctx.destination);
+    dragOsc.start(ctx.currentTime);
+  }
+
+  function updateDragTone(cent) {
+    if (!dragOsc || !audioCtx) return;
+    dragOsc.frequency.setTargetAtTime(centToHz(cent), audioCtx.currentTime, 0.01);
+  }
+
+  function stopDragTone() {
+    if (!dragOsc || !dragGain || !audioCtx) return;
+
+    const ctx = audioCtx;
+    const osc = dragOsc;
+    const gain = dragGain;
+
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.setValueAtTime(Math.max(gain.gain.value, 0.001), ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+    osc.stop(ctx.currentTime + 0.06);
+
+    dragOsc = null;
+    dragGain = null;
+  }
+
+  /* ───────── Coordinate math ───────── */
+  function svgW() { return svg.clientWidth  || wrap.clientWidth; }
+  function svgH() { return svg.clientHeight || wrap.clientHeight; }
+
+  // Map cent → Y pixel (inverted: top=1200, bottom=0)
+  const PAD_X = 60;
+  const PAD_Y = 28;
+  function centToY(cent) {
+    const h = svgH();
+    return PAD_Y + (1 - cent / CENT_MAX) * (h - PAD_Y * 2);
+  }
+  function yToCent(y) {
+    const h = svgH();
+    const raw = (1 - (y - PAD_Y) / (h - PAD_Y * 2)) * CENT_MAX;
+    return Math.round(Math.max(CENT_MIN, Math.min(CENT_MAX, raw)));
+  }
+  // Map node index → X pixel
+  function idxToX(i, total) {
+    const w = svgW();
+    if (total <= 1) return PAD_X;
+
+    const available = w - PAD_X * 2;
+    const gap = Math.min(NODE_X_GAP, available / (total - 1));
+    return PAD_X + i * gap;
+  }
+
+  function getInsertIndexFromX(x) {
+    if (nodes.length <= 1) return nodes.length;
+
+    for (let i = 1; i < nodes.length; i++) {
+      const prevX = idxToX(i - 1, nodes.length);
+      const nextX = idxToX(i, nodes.length);
+      const midX = (prevX + nextX) / 2;
+
+      if (x < midX) {
+        return Math.max(1, i);
+      }
+    }
+
+    return nodes.length;
+  }
+
+  function getAllowedCentRange(index) {
+    const prev = nodes[index - 1];
+    const next = nodes[index + 1];
+
+    return {
+      min: prev ? prev.cent : CENT_MIN,
+      max: next ? next.cent : CENT_MAX
+    };
+  }
+
+  function clampCentForIndex(cent, index) {
+    const range = getAllowedCentRange(index);
+    return Math.max(range.min, Math.min(range.max, cent));
+  }
+
+  /* ───────── Catmull-Rom spline ───────── */
+  function catmullRomPath(pts) {
+    if (pts.length === 0) return '';
+    if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
+
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const midY = (p1.y + p2.y) / 2;
+
+      // 各音高をつなぐ線は，点から上下方向へ伸びる縦曲線に統一する
+      d += ` C ${p1.x},${midY} ${p2.x},${midY} ${p2.x},${p2.y}`;
+    }
+
+    return d;
+  }
+
+  /* ───────── Render ───────── */
+  function render() {
+    svg.innerHTML = '';
+    const w = svgW(), h = svgH();
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+
+    // defs: gradient
+    const defs = el('defs');
+    const grad = el('linearGradient', { id:'fg', x1:'0', y1:'0', x2:'0', y2:'1' });
+    const s1   = el('stop', { offset:'0%',   'stop-color':'#d6d6d6', 'stop-opacity':'0.20' });
+    const s2   = el('stop', { offset:'100%', 'stop-color':'#d6d6d6', 'stop-opacity':'0.0' });
+    grad.appendChild(s1); grad.appendChild(s2);
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+
+    // grid lines every 100 cent
+    for (let c = 0; c <= CENT_MAX; c += 100) {
+      const y = centToY(c);
+      const line = el('line', { x1:0, y1:y, x2:w, y2:y, class:'grid-line' });
+      svg.appendChild(line);
+      if (SHOW_CENT_VALUES) {
+        const lbl = el('text', { x:6, y:y-3, class:'grid-label' });
+        lbl.textContent = c === 0 ? '0¢' : c === CENT_MAX ? '1200¢' : `${c}¢`;
+        svg.appendChild(lbl);
+      }
+    }
+
+    if (nodes.length === 0) return;
+
+    const pts = nodes.map((n, i) => ({
+      x: idxToX(i, nodes.length),
+      y: centToY(n.cent)
+    }));
+
+    // fill path
+    const curvePath = catmullRomPath(pts);
+    const fillD = curvePath +
+      ` L ${pts[pts.length-1].x},${h} L ${pts[0].x},${h} Z`;
+    const fillEl = el('path', { d: fillD, fill:'url(#fg)', stroke:'none' });
+    svg.appendChild(fillEl);
+
+    // stroke path
+    const strokeEl = el('path', { d: curvePath, class:'curve-path' });
+    svg.appendChild(strokeEl);
+
+    // nodes
+    nodes.forEach((n, i) => {
+      const px = pts[i].x, py = pts[i].y;
+      const circle = el('circle', {
+        cx: px, cy: py, r: n.isBase ? 9 : 8,
+        class: 'node-circle' + (n.isBase ? ' base-node' : '') + (n.playing ? ' playing' : ''),
+        'data-id': n.id
+      });
+
+      if (!n.isBase) {
+        circle.addEventListener('mousedown', onNodeMousedown);
+        circle.addEventListener('touchstart', onNodeTouchstart, { passive: false });
+        circle.addEventListener('contextmenu', e => {
+          e.preventDefault();
+          e.stopPropagation();
+          stopPlayback();
+          stopDragTone();
+          const removeId = Number(e.currentTarget.dataset.id);
+          const removeIndex = nodes.findIndex(node => node.id === removeId);
+          if (removeIndex >= 0 && !nodes[removeIndex].isBase) {
+            nodes.splice(removeIndex, 1);
+            render();
+            updatePlaybackButtons();
+          }
+        });
+      } else {
+        circle.addEventListener('mousedown', e => {
+          e.stopPropagation();
+          playTone(n.cent);
+        });
+        circle.addEventListener('touchstart', e => {
+          e.preventDefault();
+          e.stopPropagation();
+          playTone(n.cent);
+        }, { passive: false });
+      }
+
+      circle.addEventListener('mouseenter', () => showTooltip(n.cent, px, py));
+      circle.addEventListener('mouseleave', hideTooltip);
+      svg.appendChild(circle);
+    });
+
+    cntEl.textContent = nodes.length;
+  }
+
+  /* ───────── Tooltip ───────── */
+  function showTooltip(cent, svgX, svgY) {
+    if (!SHOW_CENT_VALUES) return;
+    const rect = wrap.getBoundingClientRect();
+    tooltip.textContent = `${cent} ¢  (${centToHz(cent).toFixed(2)} Hz)`;
+    tooltip.classList.add('show');
+    positionTooltip(rect.left + svgX, rect.top + svgY);
+  }
+  function positionTooltip(cx, cy) {
+    const tw = tooltip.offsetWidth + 12;
+    const th = tooltip.offsetHeight + 12;
+    tooltip.style.left = Math.min(cx + 14, window.innerWidth - tw) + 'px';
+    tooltip.style.top  = (cy - th - 2) + 'px';
+  }
+  function hideTooltip() { tooltip.classList.remove('show'); }
+
+  function centToHz(c) { return ROOT_HZ * Math.pow(2, c / 1200); }
+
+  /* ───────── Click on canvas ───────── */
+  wrap.addEventListener('click', e => {
+    if (dragging) return; // don't add on drag-end
+    const target = e.target;
+    if (target.classList.contains('node-circle')) return;
+
+    const rect = wrap.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const rawCent = yToCent(y);
+    const insertIndex = getInsertIndexFromX(x);
+    const cent = clampCentForIndex(rawCent, insertIndex);
+
+    nodes.splice(insertIndex, 0, { id: nextId++, cent, playing: false });
+    render();
+    playTone(cent);
+  });
+
+  /* ───────── Drag ───────── */
+  let dragNode = null, dragStartY = 0, dragStartCent = 0, didDrag = false;
+
+  function onNodeMousedown(e) {
+    e.stopPropagation();
+    initDrag(e.currentTarget.dataset.id, e.clientY);
+  }
+  function onNodeTouchstart(e) {
+    e.preventDefault();
+    initDrag(e.currentTarget.dataset.id, e.touches[0].clientY);
+  }
+
+  function initDrag(id, clientY) {
+    dragNode = nodes.find(n => n.id == id);
+    if (!dragNode || dragNode.isBase) return;
+    dragStartY    = clientY;
+    dragStartCent = dragNode.cent;
+    didDrag = false;
+    dragging = true;
+    startDragTone(dragNode.cent);
+  }
+
+  document.addEventListener('mousemove', e => onMove(e.clientY));
+  document.addEventListener('touchmove', e => { if (dragging) onMove(e.touches[0].clientY); }, { passive: true });
+
+  function onMove(clientY) {
+    if (!dragging || !dragNode) return;
+    didDrag = true;
+    const dy = clientY - dragStartY;
+    const h  = svgH() - PAD_Y * 2;
+    const deltaCent = Math.round(-dy / h * CENT_MAX);
+    const rawCent = Math.max(CENT_MIN, Math.min(CENT_MAX, dragStartCent + deltaCent));
+    const nodeIndex = nodes.indexOf(dragNode);
+    const newCent = clampCentForIndex(rawCent, nodeIndex);
+    if (dragNode.cent !== newCent) {
+      dragNode.cent = newCent;
+      updateDragTone(newCent);
+      render();
+      // live tooltip follow
+      if (SHOW_CENT_VALUES) {
+        const rect = wrap.getBoundingClientRect();
+        const idx  = nodes.indexOf(dragNode);
+        const px   = idxToX(idx, nodes.length);
+        const py   = centToY(newCent);
+        showTooltip(newCent, px, py);
+      }
+    }
+  }
+
+  document.addEventListener('mouseup', endDrag);
+  document.addEventListener('touchend', endDrag);
+  function endDrag() {
+    if (dragging && dragNode) {
+      stopDragTone();
+      hideTooltip();
+    }
+    dragging = false;
+    dragNode = null;
+    didDrag  = false;
+  }
+
+  /* ───────── Sequence playback ───────── */
+  btnPlayAsc.addEventListener('click', () => startPlayback('asc'));
+  btnPlayDesc.addEventListener('click', () => startPlayback('desc'));
+  btnStop.addEventListener('click', stopPlayback);
+
+  function startPlayback(mode = 'asc') {
+    if (nodes.length === 0) return;
+    stopDragTone();
+    clearTimeout(playTimeout);
+
+    currentPlaybackMode = mode;
+    playbackQueue = [...nodes].sort((a, b) => {
+      return mode === 'asc' ? a.cent - b.cent : b.cent - a.cent;
+    });
+
+    isPlaying = true;
+    updatePlaybackButtons();
+    playNext(0);
+  }
+
+  function playNext(i) {
+    if (!isPlaying || i >= playbackQueue.length) {
+      stopPlayback();
+      return;
+    }
+
+    nodes.forEach(n => n.playing = false);
+    const current = playbackQueue[i];
+    current.playing = true;
+    render();
+    playTone(current.cent, NOTE_DUR * 0.9);
+    playTimeout = setTimeout(() => playNext(i + 1), NOTE_DUR * 1000);
+  }
+
+  function updatePlaybackButtons() {
+    btnPlayAsc.classList.toggle('active', isPlaying && currentPlaybackMode === 'asc');
+    btnPlayDesc.classList.toggle('active', isPlaying && currentPlaybackMode === 'desc');
+
+    btnPlayAsc.textContent = '▲ 上昇再生';
+    btnPlayDesc.textContent = '▼ 下降再生';
+
+    btnPlayAsc.disabled = isPlaying;
+    btnPlayDesc.disabled = isPlaying;
+    btnStop.disabled = !isPlaying;
+    btnReset.disabled = isPlaying;
+    btnFinish.disabled = isPlaying;
+  }
+
+  function stopPlayback() {
+    isPlaying = false;
+    clearTimeout(playTimeout);
+    stopDragTone();
+    nodes.forEach(n => n.playing = false);
+    playbackQueue = [];
+    currentPlaybackMode = null;
+    updatePlaybackButtons();
+    render();
+  }
+
+  /* ───────── Finish ───────── */
+  btnFinish.addEventListener('click', () => {
+    stopPlayback();
+    stopDragTone();
+
+    const scaleData = nodes
+      .slice()
+      .sort((a, b) => a.cent - b.cent)
+      .map((n, i) => ({
+        index: i + 1,
+        cent: n.cent,
+        frequency: Number(centToHz(n.cent).toFixed(2)),
+        isBase: !!n.isBase
+      }));
+
+    console.log('=== 完成した音階 ===');
+    console.table(scaleData);
+    alert(`音階が完成しました。\n音数: ${nodes.length} 個`);
+  });
+
+  /* ───────── Reset ───────── */
+  btnReset.addEventListener('click', () => {
+    const removableNodes = nodes.filter(n => !n.isBase);
+    if (removableNodes.length === 0) return;
+    if (!confirm('基準音以外の全ての音を削除しますか？')) return;
+
+    stopPlayback();
+    stopDragTone();
+    nodes.length = 0;
+    nextId = 0;
+    nodes.push({ id: nextId++, cent: 0, isBase: true, playing: false });
+    render();
+    updatePlaybackButtons();
+  });
+
+  /* ───────── Init ───────── */
+  nodes.push({ id: nextId++, cent: 0, isBase: true, playing: false });
+
+  // handle resize
+  const ro = new ResizeObserver(() => render());
+  ro.observe(wrap);
+  render();
+  updatePlaybackButtons();
+
+  // initial AudioContext hint: resume on first interaction
+  document.addEventListener('pointerdown', () => getCtx(), { once: true });
+})();
+</script>
+</body>
+</html>

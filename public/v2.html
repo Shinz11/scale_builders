@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音の星座をつくろう</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #070707;
+    color: #d0d0d0;
+    font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 28px 18px 40px;
+    overflow-x: hidden;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 22px;
+    max-width: 600px;
+  }
+
+  header h1 {
+    font-size: clamp(1.7rem, 4.6vw, 2.45rem);
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    color: #eeeeee;
+    margin-bottom: 12px;
+  }
+
+  header span {
+    color: rgba(255, 255, 255, 0.25);
+  }
+
+  header p {
+    font-size: clamp(0.98rem, 2.6vw, 1.12rem);
+    color: #8a8a8a;
+    line-height: 1.7;
+    letter-spacing: 0.04em;
+  }
+
+  #explore-area {
+    position: relative;
+    width: 100%;
+    max-width: 620px;
+    border-radius: 18px;
+    overflow: hidden;
+    cursor: crosshair;
+    touch-action: none;
+    flex-shrink: 0;
+    background: radial-gradient(ellipse at 60% 40%, #151515 0%, #0d0d0d 60%, #050505 100%);
+    border: 1px solid #2a2a2a;
+    box-shadow: inset 0 0 0 1px rgba(220, 220, 220, 0.04);
+  }
+
+  #explore-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 22px;
+    max-width: 620px;
+    width: 100%;
+  }
+
+  .btn {
+    background: transparent;
+    border: 1px solid #3a3a3a;
+    color: #b8b8b8;
+    border-radius: 999px;
+    padding: 13px 26px;
+    font-size: clamp(0.95rem, 2.4vw, 1.05rem);
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, border-color 0.2s, opacity 0.2s;
+    white-space: nowrap;
+    font-family: inherit;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: #1f1f1f;
+    color: #e0e0e0;
+    border-color: #5a5a5a;
+  }
+
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  .btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .btn.primary {
+    border-color: #686868;
+    color: #c2c2c2;
+  }
+
+  .btn.primary:hover:not(:disabled) {
+    background: #252525;
+    color: #f0f0f0;
+    border-color: #8a8a8a;
+  }
+
+  .btn.danger {
+    border-color: #3e3e3e;
+    color: #9a9a9a;
+  }
+
+  .btn.danger:hover:not(:disabled) {
+    background: #222222;
+    color: #d0d0d0;
+    border-color: #6a6a6a;
+  }
+
+  #sound-count {
+    margin-top: 18px;
+    font-size: 1rem;
+    color: #747474;
+    letter-spacing: 0.08em;
+  }
+
+  #sound-count span {
+    color: #b0b0b0;
+  }
+
+  @media (max-width: 640px) {
+    body {
+      padding: 22px 12px 32px;
+    }
+
+    .controls {
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .btn {
+      flex: 1 1 calc(50% - 10px);
+      padding: 13px 12px;
+      font-size: 0.92rem;
+    }
+
+    #btn-save,
+    #btn-finish {
+      flex-basis: 100%;
+    }
+  }
+
+  #finish-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(5,5,5,0.92);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+    padding: 24px;
+  }
+
+  #finish-overlay.show {
+    display: flex;
+  }
+
+  .finish-inner {
+    max-width: 420px;
+  }
+
+  #finish-overlay h2 {
+    font-size: clamp(1.1rem, 4vw, 1.5rem);
+    font-weight: 400;
+    color: #e4e4e4;
+    letter-spacing: 0.12em;
+    margin-bottom: 12px;
+  }
+
+  #finish-overlay p {
+    font-size: 0.88rem;
+    color: #8a8a8a;
+    line-height: 1.8;
+    margin-bottom: 8px;
+  }
+
+  .finish-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 24px;
+    flex-wrap: wrap;
+  }
+
+  #stars-canvas-bg {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>音の星座をつくろう</h1>
+  <span>音階作成システム  v0.2</span>
+  <p>暗い空間をクリックして，気になる音を探してください。<br>好きな音が見つかったら，その場所を残していきましょう。</p>
+</header>
+
+<div id="explore-area">
+  <canvas id="stars-canvas-bg"></canvas>
+  <canvas id="explore-canvas"></canvas>
+</div>
+
+<div class="controls">
+  <button class="btn primary" id="btn-save" disabled>この音を星にする</button>
+  <button class="btn" id="btn-play-sorted" disabled>▲ 上昇再生</button>
+  <button class="btn" id="btn-play-desc" disabled>▼ 下降再生</button>
+  <button class="btn" id="btn-stop" disabled>■ 停止</button>
+  <button class="btn" id="btn-undo" disabled>1つ戻す</button>
+  <button class="btn danger" id="btn-reset" disabled>リセット</button>
+  <button class="btn primary" id="btn-finish" disabled>完成</button>
+</div>
+
+<div id="sound-count">選んだ音：<span id="count-num">0</span>個</div>
+
+<div id="finish-overlay">
+  <div class="finish-inner">
+    <h2>あなたの音の星座が完成しました</h2>
+    <p id="finish-count-text">選んだ音：0個</p>
+    <p>選んだ音をもう一度聴いてみましょう</p>
+    <div class="finish-buttons">
+      <button class="btn primary" id="btn-rehear">もう一度聴く</button>
+      <button class="btn" id="btn-close-finish">戻る</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const BASE_FREQ = 261.63;
+  const MIN_CENTS = 0;
+  const MAX_CENTS = 1200;
+
+  const SHOW_RINGS = false; // 開発時は true、実験時は false にする
+
+  const RING_INTERVAL_CENTS = 100;
+  const RING_MAX_RATIO = 0.46;
+
+
+  let audioCtx = null;
+  let savedSounds = [];
+  let lastSound = null;
+  let isPlaying = false;
+  let playTimeout = null;
+  let isDragging = false;
+  let lastDragPlayTime = 0;
+  let dragTrail = [];
+  let ripples = [];
+  let animationFrame = null;
+
+  const exploreArea = document.getElementById('explore-area');
+  const canvas = document.getElementById('explore-canvas');
+  const ctx = canvas.getContext('2d');
+  const bgCanvas = document.getElementById('stars-canvas-bg');
+  const bgCtx = bgCanvas.getContext('2d');
+
+  function initAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+
+  function centsToFreq(cents) {
+    return BASE_FREQ * Math.pow(2, cents / 1200);
+  }
+
+  function playSound(freq, duration = 0.55, volume = 0.22) {
+    initAudio();
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, now);
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(volume, now + 0.012);
+    gain.gain.setValueAtTime(volume, now + duration * 0.55);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + duration + 0.02);
+  }
+
+  function positionToCents(x, y, w, h) {
+    const cx = w / 2;
+    const cy = h / 2;
+    const dx = x - cx;
+    const dy = y - cy;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const maxRadius = Math.min(w, h) * RING_MAX_RATIO;
+    const ratio = Math.min(distance / maxRadius, 1);
+    return MIN_CENTS + ratio * (MAX_CENTS - MIN_CENTS);
+
+}
+
+  function setupCanvasSize() {
+    const area = exploreArea;
+    const w = area.offsetWidth;
+    const h = Math.round(Math.min(w, window.innerHeight * 0.68));
+    area.style.height = h + 'px';
+    canvas.width = w;
+    canvas.height = h;
+    bgCanvas.width = w;
+    bgCanvas.height = h;
+    drawBackground();
+    drawSavedPoints();
+  }
+
+  let bgStars = [];
+  function generateStars(w, h) {
+    bgStars = [];
+    const count = Math.floor((w * h) / 1600);
+    for (let i = 0; i < count; i++) {
+      bgStars.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: Math.random() * 1.0 + 0.15,
+        a: Math.random() * 0.35 + 0.05
+      });
+    }
+  }
+
+  function drawBackground() {
+    const w = bgCanvas.width;
+    const h = bgCanvas.height;
+    bgCtx.clearRect(0, 0, w, h);
+
+    if (bgStars.length === 0 || bgStars.length < 10) generateStars(w, h);
+
+    for (const s of bgStars) {
+      bgCtx.beginPath();
+      bgCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      bgCtx.fillStyle = `rgba(220,220,220,${s.a})`;
+      bgCtx.fill();
+    }
+
+    if (SHOW_RINGS) drawPitchRings(w, h);
+    drawBaseStar(w, h);
+  }
+
+  function drawPitchRings(w, h) {
+  const cx = w / 2;
+  const cy = h / 2;
+  const maxRadius = Math.min(w, h) * RING_MAX_RATIO;
+
+  bgCtx.save();
+
+  bgCtx.strokeStyle = 'rgba(190, 190, 190, 0.14)';
+  bgCtx.lineWidth = 1;
+
+  for (let cents = RING_INTERVAL_CENTS; cents <= MAX_CENTS; cents += RING_INTERVAL_CENTS) {
+    const r = ((cents - MIN_CENTS) / (MAX_CENTS - MIN_CENTS)) * maxRadius;
+    bgCtx.beginPath();
+    bgCtx.arc(cx, cy, r, 0, Math.PI * 2);
+    bgCtx.stroke();
+  }
+
+  bgCtx.restore();
+}
+
+function drawBaseStar(w, h) {
+  const cx = w / 2;
+  const cy = h / 2;
+
+  drawBackgroundStar(
+    cx,
+    cy,
+    9,
+    'rgba(230, 230, 230, 0.72)',
+    'rgba(180, 180, 180, 0.16)',
+    22
+  );
+}
+
+function drawBackgroundStar(px, py, r, color, glowColor, glowR) {
+  bgCtx.beginPath();
+  bgCtx.arc(px, py, glowR, 0, Math.PI * 2);
+  const grad = bgCtx.createRadialGradient(px, py, 0, px, py, glowR);
+  grad.addColorStop(0, glowColor);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  bgCtx.fillStyle = grad;
+  bgCtx.fill();
+
+  bgCtx.save();
+  bgCtx.translate(px, py);
+  bgCtx.rotate(-Math.PI / 2);
+  bgCtx.beginPath();
+
+  for (let i = 0; i < 10; i++) {
+    const angle = (Math.PI * 2 * i) / 10;
+    const radius = i % 2 === 0 ? r : r * 0.42;
+    const sx = Math.cos(angle) * radius;
+    const sy = Math.sin(angle) * radius;
+
+    if (i === 0) bgCtx.moveTo(sx, sy);
+    else bgCtx.lineTo(sx, sy);
+  }
+
+  bgCtx.closePath();
+  bgCtx.fillStyle = color;
+  bgCtx.fill();
+  bgCtx.restore();
+}
+
+  function drawSavedPoints() {
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    if (savedSounds.length >= 1) {
+      const soundsByPitch = [...savedSounds].sort((a, b) => a.cents - b.cents);
+
+      ctx.beginPath();
+      ctx.moveTo(w / 2, h / 2);
+
+      soundsByPitch.forEach((s) => {
+        const px = s.normX * w;
+        const py = s.normY * h;
+        ctx.lineTo(px, py);
+      });
+
+      ctx.strokeStyle = 'rgba(190, 190, 190, 0.28)';
+      ctx.lineWidth = 1.2;
+      ctx.shadowColor = 'rgba(180, 180, 180, 0.35)';
+      ctx.shadowBlur = 8;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    for (const s of savedSounds) {
+      const px = s.normX * w;
+      const py = s.normY * h;
+      drawStarShape(px, py, 5, 'rgba(225, 225, 225, 0.95)', 'rgba(170, 170, 170, 0.24)', 15);
+    }
+  }
+
+  function drawStarPoint(px, py, r, color, glowColor, glowR) {
+    ctx.beginPath();
+    ctx.arc(px, py, glowR, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(px, py, 0, px, py, glowR);
+    grad.addColorStop(0, glowColor);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  function drawStarShape(px, py, r, color, glowColor, glowR) {
+    ctx.beginPath();
+    ctx.arc(px, py, glowR, 0, Math.PI * 2);
+    const grad = ctx.createRadialGradient(px, py, 0, px, py, glowR);
+    grad.addColorStop(0, glowColor);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(-Math.PI / 2);
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const angle = (Math.PI * 2 * i) / 10;
+      const radius = i % 2 === 0 ? r : r * 0.42;
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function addRipple(px, py) {
+    ripples.push({ x: px, y: py, born: performance.now(), life: 760 });
+    startAnimationLoop();
+  }
+
+  function addTrailPoint(px, py) {
+    dragTrail.push({ x: px, y: py, born: performance.now(), life: 520 });
+    if (dragTrail.length > 80) dragTrail.shift();
+    startAnimationLoop();
+  }
+
+  function drawEffects() {
+    const now = performance.now();
+
+    ripples = ripples.filter(r => now - r.born < r.life);
+    for (const r of ripples) {
+      const t = (now - r.born) / r.life;
+      const radius = 8 + t * 52;
+      const alpha = Math.pow(1 - t, 1.35);
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(220, 220, 220, ${alpha * 0.55})`;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      drawStarPoint(r.x, r.y, 3 + t * 2, `rgba(240, 240, 240, ${alpha * 0.8})`, `rgba(180, 180, 180, ${alpha * 0.18})`, 18);
+    }
+
+    dragTrail = dragTrail.filter(p => now - p.born < p.life);
+    for (let i = 0; i < dragTrail.length; i++) {
+      const p = dragTrail[i];
+      const t = (now - p.born) / p.life;
+      const alpha = Math.pow(1 - t, 1.6);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2.4, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(220, 220, 220, ${alpha * 0.42})`;
+      ctx.fill();
+    }
+  }
+
+  function renderFrame() {
+    drawSavedPoints();
+    drawEffects();
+    if (ripples.length > 0 || dragTrail.length > 0) {
+      animationFrame = requestAnimationFrame(renderFrame);
+    } else {
+      animationFrame = null;
+      drawSavedPoints();
+    }
+  }
+
+  function startAnimationLoop() {
+    if (!animationFrame) animationFrame = requestAnimationFrame(renderFrame);
+  }
+
+  function getEventPos(e) {
+    const rect = exploreArea.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function previewAtPosition(x, y, options = {}) {
+    const w = canvas.width;
+    const h = canvas.height;
+    if (x < 0 || y < 0 || x > w || y > h) return;
+
+    const cents = positionToCents(x, y, w, h);
+    const freq = centsToFreq(cents);
+    const duration = options.drag ? 0.16 : 0.55;
+    const volume = options.drag ? 0.12 : 0.22;
+
+    playSound(freq, duration, volume);
+    addRipple(x, y);
+    if (options.drag) addTrailPoint(x, y);
+
+    lastSound = {
+      normX: x / w,
+      normY: y / h,
+      x, y, cents, freq,
+      order: savedSounds.length
+    };
+
+    document.getElementById('btn-save').disabled = false;
+  }
+
+  function handlePointerDown(e) {
+    e.preventDefault();
+    exploreArea.setPointerCapture(e.pointerId);
+    isDragging = true;
+    lastDragPlayTime = performance.now();
+    const { x, y } = getEventPos(e);
+    previewAtPosition(x, y, { drag: false });
+  }
+
+  function handlePointerMove(e) {
+    if (!isDragging) return;
+    e.preventDefault();
+    const now = performance.now();
+    const { x, y } = getEventPos(e);
+    addTrailPoint(x, y);
+    if (now - lastDragPlayTime > 90) {
+      previewAtPosition(x, y, { drag: true });
+      lastDragPlayTime = now;
+    }
+  }
+
+  function handlePointerUp(e) {
+    if (!isDragging) return;
+    e.preventDefault();
+    isDragging = false;
+    try {
+      exploreArea.releasePointerCapture(e.pointerId);
+    } catch (error) {
+      // Ignore release errors when the pointer capture has already ended.
+    }
+  }
+
+  exploreArea.addEventListener('pointerdown', handlePointerDown);
+  exploreArea.addEventListener('pointermove', handlePointerMove);
+  exploreArea.addEventListener('pointerup', handlePointerUp);
+  exploreArea.addEventListener('pointercancel', handlePointerUp);
+  exploreArea.addEventListener('pointerleave', handlePointerUp);
+
+  document.getElementById('btn-save').addEventListener('click', () => {
+    if (!lastSound) return;
+    const sound = Object.assign({}, lastSound, { order: savedSounds.length });
+    savedSounds.push(sound);
+    lastSound = null;
+    document.getElementById('btn-save').disabled = true;
+    updateUI();
+    drawSavedPoints();
+  });
+
+  function playSoundsInSequence(sounds, gap = 0.65, includeBaseTone = true) {
+    if (isPlaying) return;
+    if (!sounds.length && !includeBaseTone) return;
+    initAudio();
+    isPlaying = true;
+    setButtonsPlayingState(true);
+
+    const queue = includeBaseTone
+      ? [{ cents: MIN_CENTS, freq: BASE_FREQ, normX: 0.5, normY: 0.5, isBaseTone: true }, ...sounds]
+      : sounds;
+
+    let i = 0;
+    function next() {
+      if (i >= queue.length) {
+        stopPlayback();
+        return;
+      }
+      playSound(queue[i].freq, 0.5);
+      flashSavedPoint(queue[i]);
+      i++;
+      playTimeout = setTimeout(next, gap * 1000);
+    }
+    next();
+  }
+
+  function flashSavedPoint(sound) {
+    const w = canvas.width;
+    const h = canvas.height;
+    const px = sound.normX * w;
+    const py = sound.normY * h;
+    let frame = 0;
+    const total = 22;
+    function tick() {
+      drawSavedPoints();
+      const t = frame / total;
+      const a = Math.max(0, 1 - t);
+      drawStarShape(px, py, 7 + t * 3, `rgba(245,245,245,${a})`, `rgba(200,200,200,${a * 0.34})`, 24);
+      frame++;
+      if (frame <= total) requestAnimationFrame(tick);
+      else drawSavedPoints();
+    }
+    tick();
+  }
+
+  function setButtonsPlayingState(playing) {
+    const ids = ['btn-play-sorted', 'btn-play-desc', 'btn-undo', 'btn-reset', 'btn-finish', 'btn-save'];
+    ids.forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) btn.disabled = playing;
+    });
+      
+    const stopBtn = document.getElementById('btn-stop');
+    if (stopBtn) stopBtn.disabled = !playing;
+
+    if(!playing) updateUI();
+  }
+
+  function stopPlayback() {
+    clearTimeout(playTimeout);
+    playTimeout = null;
+    isPlaying = false;
+    setButtonsPlayingState(false);
+    drawSavedPoints();
+  }
+
+  document.getElementById('btn-stop').addEventListener('click', stopPlayback);
+
+  document.getElementById('btn-play-sorted').addEventListener('click', () => {
+    const sorted = [...savedSounds].sort((a, b) => a.cents - b.cents);
+    playSoundsInSequence(sorted);
+  });
+
+  document.getElementById('btn-play-desc').addEventListener('click', () => {
+    const desc = [...savedSounds].sort((a, b) => b.cents - a.cents);
+    const baseTone = { cents: MIN_CENTS, freq: BASE_FREQ, normX: 0.5, normY: 0.5, isBaseTone: true };
+    playSoundsInSequence([...desc, baseTone], 0.65, false);
+  });
+
+  document.getElementById('btn-undo').addEventListener('click', () => {
+    if (savedSounds.length === 0) return;
+    savedSounds.pop();
+    lastSound = null;
+    document.getElementById('btn-save').disabled = true;
+    updateUI();
+    drawSavedPoints();
+  });
+
+  document.getElementById('btn-reset').addEventListener('click', () => {
+    if (savedSounds.length === 0) return;
+    if (!confirm('基準音以外の全ての音を削除しますか？')) return;
+
+    stopPlayback();
+    savedSounds = [];
+    lastSound = null;
+    document.getElementById('btn-save').disabled = true;
+    updateUI();
+    drawSavedPoints();
+  });
+
+  document.getElementById('btn-finish').addEventListener('click', () => {
+    if (savedSounds.length === 0) return;
+    document.getElementById('finish-count-text').textContent = `選んだ音：${savedSounds.length}個`;
+    document.getElementById('finish-overlay').classList.add('show');
+    console.log('=== 完成した音の星座 ===');
+    savedSounds.forEach((s, i) => {
+      console.log(`音${i + 1}: x=${s.normX.toFixed(3)}, y=${s.normY.toFixed(3)}, cents=${s.cents.toFixed(1)}, freq=${s.freq.toFixed(2)}Hz, 保存順=${s.order + 1}`);
+    });
+  });
+
+  document.getElementById('btn-rehear').addEventListener('click', () => {
+    const sorted = [...savedSounds].sort((a, b) => a.cents - b.cents);
+    playSoundsInSequence(sorted);
+  });
+
+  document.getElementById('btn-close-finish').addEventListener('click', () => {
+    document.getElementById('finish-overlay').classList.remove('show');
+  });
+
+  function updateUI() {
+    const n = savedSounds.length;
+    document.getElementById('count-num').textContent = n;
+    document.getElementById('btn-play-sorted').disabled = n === 0 || isPlaying;
+    document.getElementById('btn-play-desc').disabled = n === 0 || isPlaying;
+    document.getElementById('btn-stop').disabled = !isPlaying;
+    document.getElementById('btn-undo').disabled = n === 0 || isPlaying;
+    document.getElementById('btn-reset').disabled = n === 0 || isPlaying;
+    document.getElementById('btn-finish').disabled = n === 0 || isPlaying;
+  }
+
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      bgStars = [];
+      dragTrail = [];
+      ripples = [];
+      setupCanvasSize();
+    }, 120);
+  });
+
+  setupCanvasSize();
+  updateUI();
+})();
+</script>
+</body>
+</html>
