@@ -1,0 +1,602 @@
+
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>円環音階作成インタフェース</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+JP:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface2: #181c24;
+    --border: #232840;
+    --accent: #c8c8c8;
+    --accent2: #8f8f8f;
+    --accent3: #6f6f6f;
+    --text: #d8dce8;
+    --text-dim: #5a6080;
+    --text-muted: #353a55;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.35;
+  }
+
+  header {
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+  }
+
+  header h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.25em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  header span {
+    font-size: 11px;
+    color: rgba(216, 220, 232, 0.36);
+    letter-spacing: 0.1em;
+  }
+
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .circle-section {
+    flex: 1;
+    min-height: 640px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 38px 42px 44px;
+    position: relative;
+  }
+
+  .section-label {
+    position: absolute;
+    top: 24px;
+    left: 56px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  #circleCanvas {
+    display: block;
+    cursor: crosshair;
+    background: radial-gradient(circle at 50% 45%, rgba(255,255,255,0.035), rgba(255,255,255,0.006) 58%, transparent 72%);
+    border-radius: 18px;
+    touch-action: none;
+  }
+
+  #circleCanvas.dragging { cursor: grabbing; }
+
+  .controls {
+    padding: 20px 40px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    padding: 8px 18px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+
+  .btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(200,200,200,0.05);
+  }
+
+  .btn:active:not(:disabled) { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .btn.primary {
+    border-color: var(--accent2);
+    color: var(--accent2);
+    background: rgba(180,180,180,0.08);
+  }
+
+  .btn.primary:hover:not(:disabled) {
+    background: rgba(190,190,190,0.16);
+    box-shadow: 0 0 12px rgba(190,190,190,0.22);
+  }
+
+  .btn.danger { border-color: var(--accent3); color: var(--accent3); }
+  .btn.danger:hover:not(:disabled) { background: rgba(160,160,160,0.1); }
+  .spacer { flex: 1; }
+
+  .status-bar {
+    padding: 10px 40px;
+    border-top: 1px solid var(--border);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .status-item span { color: var(--text-dim); }
+
+  #tooltip {
+    position: fixed;
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    padding: 4px 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    pointer-events: none;
+    display: none;
+    z-index: 1000;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 720px) {
+    header { padding: 24px 18px 18px; flex-direction: column; gap: 8px; }
+    .circle-section { min-height: 560px; padding: 42px 18px 36px; }
+    .section-label { left: 24px; }
+    .controls { padding: 18px; }
+    .btn { flex: 1 1 calc(50% - 12px); }
+    .spacer { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Circular Scale Builder</h1>
+  <span>音を円環上に配置するインタフェース</span>
+</header>
+
+<div class="main">
+  <div class="circle-section">
+    <div class="section-label">Circular Pitch Space</div>
+    <canvas id="circleCanvas"></canvas>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn primary" id="btnAsc">▲ 上昇再生</button>
+  <button class="btn primary" id="btnDesc">▼ 下降再生</button>
+  <button class="btn" id="btnStop" disabled>■ 停止</button>
+  <div class="spacer"></div>
+  <button class="btn danger" id="btnClear">リセット</button>
+  <button class="btn primary" id="btnFinish">完成</button>
+</div>
+
+<div class="status-bar">
+  <div class="status-item">音数: <span id="statCount">1</span></div>
+  <div class="status-item">クリック → 音追加 · 音をドラッグ → 音高調整 · 右クリック → 削除</div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+const BASE_FREQ = 261.63;
+const SHOW_CENT_TOOLTIP = true; // 開発時は true、実験時は false にする
+const MIN_CENT = 0;
+const MAX_CENT = 1200;
+const SNAP_STEP = 1;
+
+let notes = [{ id: 0, cent: 0, isBase: true, playing: false }];
+let nextId = 1;
+let audioCtx = null;
+let stopRequested = false;
+let dragOsc = null;
+let dragGain = null;
+let dragging = null;
+
+const canvas = document.getElementById('circleCanvas');
+const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+const statCount = document.getElementById('statCount');
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function centToFreq(cent) {
+  return BASE_FREQ * Math.pow(2, cent / 1200);
+}
+
+function playTone(cent, duration = 0.55, startTime = 0, volume = 0.22) {
+  const ctxAudio = getAudioCtx();
+  const t = startTime || ctxAudio.currentTime;
+  const osc = ctxAudio.createOscillator();
+  const gain = ctxAudio.createGain();
+
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(centToFreq(cent), t);
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(volume, t + 0.012);
+  gain.gain.setValueAtTime(volume, t + duration * 0.55);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+
+  osc.connect(gain);
+  gain.connect(ctxAudio.destination);
+  osc.start(t);
+  osc.stop(t + duration + 0.02);
+}
+
+function startDragTone(cent) {
+  const ctxAudio = getAudioCtx();
+  stopDragTone();
+  dragOsc = ctxAudio.createOscillator();
+  dragGain = ctxAudio.createGain();
+  dragOsc.type = 'triangle';
+  dragOsc.frequency.setValueAtTime(centToFreq(cent), ctxAudio.currentTime);
+  dragGain.gain.setValueAtTime(0.001, ctxAudio.currentTime);
+  dragGain.gain.linearRampToValueAtTime(0.12, ctxAudio.currentTime + 0.02);
+  dragOsc.connect(dragGain);
+  dragGain.connect(ctxAudio.destination);
+  dragOsc.start(ctxAudio.currentTime);
+}
+
+function updateDragTone(cent) {
+  if (!dragOsc || !audioCtx) return;
+  dragOsc.frequency.setTargetAtTime(centToFreq(cent), audioCtx.currentTime, 0.01);
+}
+
+function stopDragTone() {
+  if (!dragOsc || !dragGain || !audioCtx) return;
+  const ctxAudio = audioCtx;
+  const osc = dragOsc;
+  const gain = dragGain;
+  gain.gain.cancelScheduledValues(ctxAudio.currentTime);
+  gain.gain.setValueAtTime(Math.max(gain.gain.value, 0.001), ctxAudio.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctxAudio.currentTime + 0.04);
+  osc.stop(ctxAudio.currentTime + 0.06);
+  dragOsc = null;
+  dragGain = null;
+}
+
+function resizeCanvas() {
+  const parent = canvas.parentElement;
+  const size = Math.min(parent.clientWidth - 80, parent.clientHeight - 80, 680);
+  canvas.width = Math.max(320, size);
+  canvas.height = Math.max(320, size);
+  render();
+}
+
+function getCircleGeometry() {
+  const size = Math.min(canvas.width, canvas.height);
+  return {
+    cx: canvas.width / 2,
+    cy: canvas.height / 2,
+    radius: size * 0.34,
+    innerRadius: size * 0.25,
+    outerRadius: size * 0.43
+  };
+}
+
+function centToAngle(cent) {
+  return (cent / 1200) * Math.PI * 2 - Math.PI / 2;
+}
+
+function angleToCent(angle) {
+  let normalized = angle + Math.PI / 2;
+  normalized = ((normalized % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  return Math.round((normalized / (Math.PI * 2)) * 1200 / SNAP_STEP) * SNAP_STEP;
+}
+
+function centToPosition(cent) {
+  const { cx, cy, radius } = getCircleGeometry();
+  const angle = centToAngle(cent);
+  return {
+    x: cx + Math.cos(angle) * radius,
+    y: cy + Math.sin(angle) * radius
+  };
+}
+
+function clientToCanvasPoint(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY
+  };
+}
+
+function clientToCent(clientX, clientY) {
+  const { cx, cy } = getCircleGeometry();
+  const p = clientToCanvasPoint(clientX, clientY);
+  const angle = Math.atan2(p.y - cy, p.x - cx);
+  return Math.max(MIN_CENT, Math.min(MAX_CENT, angleToCent(angle)));
+}
+
+function findNoteAt(clientX, clientY) {
+  const p = clientToCanvasPoint(clientX, clientY);
+  let nearest = null;
+  let nearestDist = Infinity;
+
+  notes.forEach(note => {
+    const pos = centToPosition(note.cent);
+    const dist = Math.hypot(p.x - pos.x, p.y - pos.y);
+    if (dist < nearestDist) {
+      nearestDist = dist;
+      nearest = note;
+    }
+  });
+
+  return nearestDist <= 26 ? nearest : null;
+}
+
+function drawCircle(cx, cy, radius, strokeStyle, lineWidth = 1) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.strokeStyle = strokeStyle;
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
+}
+
+function drawPoint(x, y, radius, fillStyle, glowRadius = 0, glowStyle = null) {
+  if (glowRadius > 0 && glowStyle) {
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, glowRadius);
+    grad.addColorStop(0, glowStyle);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath();
+    ctx.arc(x, y, glowRadius, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fillStyle = fillStyle;
+  ctx.fill();
+}
+
+
+function render() {
+  const { cx, cy, radius } = getCircleGeometry();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  drawCircle(cx, cy, radius, 'rgba(180,180,180,0.28)', 1.5);
+
+  // 基準位置だけは控えめに表示する。音名や具体的な音高名は出さない。
+  const baseGuide = centToPosition(0);
+  drawPoint(baseGuide.x, baseGuide.y, 3, 'rgba(210,210,210,0.42)');
+
+  notes.forEach(note => {
+    const pos = centToPosition(note.cent);
+    const isBase = !!note.isBase;
+    const isPlaying = !!note.playing;
+
+    if (isPlaying) {
+      drawPoint(pos.x, pos.y, 7, 'rgba(245,245,245,0.96)', 24, 'rgba(255,255,255,0.14)');
+      return;
+    }
+
+    if (isBase) {
+      drawPoint(pos.x, pos.y, 6, 'rgba(170,170,170,0.96)', 20, 'rgba(220,220,220,0.10)');
+      return;
+    }
+
+    drawPoint(pos.x, pos.y, 5, 'rgba(215,215,215,0.92)', 16, 'rgba(220,220,220,0.10)');
+  });
+
+  statCount.textContent = notes.length;
+}
+
+function addNote(cent, shouldPlay = true) {
+  const id = nextId++;
+  notes.push({ id, cent, playing: false });
+  notes.sort((a, b) => a.cent - b.cent);
+  render();
+  if (shouldPlay) playTone(cent);
+}
+
+function removeNote(id) {
+  const note = notes.find(n => n.id === id);
+  if (note && note.isBase) return;
+  notes = notes.filter(n => n.id !== id);
+  render();
+}
+
+function updateNoteCent(id, cent) {
+  const note = notes.find(n => n.id === id);
+  if (!note || note.isBase) return;
+  note.cent = Math.round(Math.max(MIN_CENT, Math.min(MAX_CENT, cent)));
+  notes.sort((a, b) => a.cent - b.cent);
+}
+
+function showTooltip(x, y, text) {
+  if (!SHOW_CENT_TOOLTIP) return;
+  tooltip.style.display = 'block';
+  tooltip.style.left = (x + 14) + 'px';
+  tooltip.style.top = (y - 10) + 'px';
+  tooltip.textContent = text;
+}
+
+function hideTooltip() {
+  tooltip.style.display = 'none';
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  const note = findNoteAt(e.clientX, e.clientY);
+
+  if (note && !note.isBase) {
+    dragging = { id: note.id };
+    canvas.classList.add('dragging');
+    startDragTone(note.cent);
+    return;
+  }
+
+  if (note && note.isBase) {
+    playTone(note.cent);
+    return;
+  }
+
+  const cent = clientToCent(e.clientX, e.clientY);
+  addNote(cent, true);
+});
+
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const note = findNoteAt(e.clientX, e.clientY);
+  if (!note || note.isBase) return;
+  stopPlayback();
+  stopDragTone();
+  removeNote(note.id);
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (dragging) {
+    const cent = clientToCent(e.clientX, e.clientY);
+    updateNoteCent(dragging.id, cent);
+    updateDragTone(cent);
+    render();
+    showTooltip(e.clientX, e.clientY, cent + ' ¢');
+    return;
+  }
+
+  const note = findNoteAt(e.clientX, e.clientY);
+  if (note) showTooltip(e.clientX, e.clientY, note.cent + ' ¢');
+  else hideTooltip();
+});
+
+canvas.addEventListener('mouseleave', () => {
+  if (!dragging) hideTooltip();
+});
+
+document.addEventListener('mouseup', () => {
+  if (!dragging) return;
+  stopDragTone();
+  dragging = null;
+  hideTooltip();
+  canvas.classList.remove('dragging');
+  notes.sort((a, b) => a.cent - b.cent);
+  render();
+});
+
+async function playScale(ascending) {
+  if (notes.length === 0) return;
+  stopRequested = false;
+  stopDragTone();
+  updateButtonsPlaying(true);
+  const ordered = ascending
+    ? [...notes].sort((a, b) => a.cent - b.cent)
+    : [...notes].sort((a, b) => b.cent - a.cent);
+
+  for (let i = 0; i < ordered.length; i++) {
+    if (stopRequested) break;
+    notes.forEach(n => n.playing = false);
+    ordered[i].playing = true;
+    render();
+    playTone(ordered[i].cent, 0.5);
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  notes.forEach(n => n.playing = false);
+  render();
+  updateButtonsPlaying(false);
+}
+
+function stopPlayback() {
+  stopRequested = true;
+  stopDragTone();
+  notes.forEach(n => n.playing = false);
+  render();
+  updateButtonsPlaying(false);
+}
+
+function updateButtonsPlaying(isPlaying) {
+  document.getElementById('btnAsc').disabled = isPlaying;
+  document.getElementById('btnDesc').disabled = isPlaying;
+  document.getElementById('btnStop').disabled = !isPlaying;
+  document.getElementById('btnClear').disabled = isPlaying;
+  document.getElementById('btnFinish').disabled = isPlaying;
+}
+
+document.getElementById('btnAsc').addEventListener('click', () => playScale(true));
+document.getElementById('btnDesc').addEventListener('click', () => playScale(false));
+document.getElementById('btnStop').addEventListener('click', stopPlayback);
+
+document.getElementById('btnClear').addEventListener('click', () => {
+  const removableNotes = notes.filter(n => !n.isBase);
+  if (removableNotes.length === 0) return;
+  if (!confirm('基準音以外の全ての音を削除しますか？')) return;
+  stopPlayback();
+  stopDragTone();
+  notes = notes.filter(n => n.isBase);
+  render();
+});
+
+document.getElementById('btnFinish').addEventListener('click', () => {
+  stopPlayback();
+  stopDragTone();
+  const scaleData = [...notes]
+    .sort((a, b) => a.cent - b.cent)
+    .map((n, i) => ({
+      index: i + 1,
+      cent: n.cent,
+      frequency: Number(centToFreq(n.cent).toFixed(2)),
+      isBase: !!n.isBase
+    }));
+  console.log('=== 完成した音階 ===');
+  console.table(scaleData);
+  alert(`音階が完成しました。\n音数: ${notes.length} 個`);
+});
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+updateButtonsPlaying(false);
+document.addEventListener('pointerdown', () => getAudioCtx(), { once: true });
+</script>
+</body>
+</html>

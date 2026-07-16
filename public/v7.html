@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>螺旋音階作成インタフェース</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+JP:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface2: #181c24;
+    --border: #232840;
+    --accent: #c8c8c8;
+    --accent2: #8f8f8f;
+    --accent3: #6f6f6f;
+    --text: #d8dce8;
+    --text-dim: #5a6080;
+    --text-muted: #353a55;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.35;
+  }
+
+  header {
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+  }
+
+  header h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.25em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  header span {
+    font-size: 11px;
+    color: rgba(216, 220, 232, 0.36);
+    letter-spacing: 0.1em;
+  }
+
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .spiral-section {
+    flex: 1;
+    min-height: 640px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 38px 42px 44px;
+    position: relative;
+  }
+
+  .section-label {
+    position: absolute;
+    top: 24px;
+    left: 56px;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  .spiral-viewer {
+    width: min(100%, 960px);
+    border: 1px solid rgba(200,200,200,0.18);
+    border-radius: 22px;
+    padding: 16px;
+    background: rgba(255,255,255,0.012);
+    box-shadow: inset 0 0 28px rgba(255,255,255,0.018);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+  }
+
+  #spiralCanvas {
+    display: block;
+    cursor: crosshair;
+    background: radial-gradient(circle at 50% 45%, rgba(255,255,255,0.035), rgba(255,255,255,0.006) 58%, transparent 72%);
+    border-radius: 18px;
+    touch-action: none;
+  }
+
+  #spiralCanvas.dragging { cursor: grabbing; }
+
+  .viewer-caption {
+    font-size: 11px;
+    line-height: 1.8;
+    letter-spacing: 0.08em;
+    color: rgba(216, 220, 232, 0.42);
+    text-align: center;
+  }
+
+  .viewer-caption strong {
+    color: rgba(216, 220, 232, 0.68);
+    font-weight: 500;
+  }
+
+  .controls {
+    padding: 20px 40px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    padding: 8px 18px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+
+  .btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(200,200,200,0.05);
+  }
+
+  .btn:active:not(:disabled) { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .btn.primary {
+    border-color: var(--accent2);
+    color: var(--accent2);
+    background: rgba(180,180,180,0.08);
+  }
+
+  .btn.primary:hover:not(:disabled) {
+    background: rgba(190,190,190,0.16);
+    box-shadow: 0 0 12px rgba(190,190,190,0.22);
+  }
+
+  .btn.danger { border-color: var(--accent3); color: var(--accent3); }
+  .btn.danger:hover:not(:disabled) { background: rgba(160,160,160,0.1); }
+  .spacer { flex: 1; }
+
+  .status-bar {
+    padding: 10px 40px;
+    border-top: 1px solid var(--border);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+
+  .status-item span { color: var(--text-dim); }
+
+  #tooltip {
+    position: fixed;
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    padding: 4px 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    pointer-events: none;
+    display: none;
+    z-index: 1000;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 720px) {
+    header { padding: 24px 18px 18px; flex-direction: column; gap: 8px; }
+    .spiral-section { min-height: 560px; padding: 42px 18px 36px; }
+    .section-label { left: 24px; }
+    .controls { padding: 18px; }
+    .btn { flex: 1 1 calc(50% - 12px); }
+    .spacer { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Spiral Scale Builder</h1>
+  <span>音を螺旋上に配置するインタフェース</span>
+</header>
+
+<div class="main">
+  <div class="spiral-section">
+    <div class="section-label">Spiral Pitch Space</div>
+    <div class="spiral-viewer">
+      <canvas id="spiralCanvas"></canvas>
+      <div class="viewer-caption">
+        <strong>枠内をドラッグ</strong>すると，螺旋構造をいろいろな角度から確認できます。
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn primary" id="btnAsc">▲ 上昇再生</button>
+  <button class="btn primary" id="btnDesc">▼ 下降再生</button>
+  <button class="btn" id="btnStop" disabled>■ 停止</button>
+  <div class="spacer"></div>
+  <button class="btn danger" id="btnClear">リセット</button>
+  <button class="btn primary" id="btnFinish">完成</button>
+</div>
+
+<div class="status-bar">
+  <div class="status-item">音数: <span id="statCount">1</span></div>
+  <div class="status-item">クリック → 音追加 · 音をドラッグ → 音高調整 · 枠内の空白をドラッグ → 螺旋を回転 · 右クリック → 削除</div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+const BASE_FREQ = 261.63;
+const SHOW_CENT_TOOLTIP = true; // 開発時は true、実験時は false にする
+const MIN_CENT = 0;
+const MAX_CENT = 1199;
+const SPIRAL_DISPLAY_MIN_CENT = 0;
+const SPIRAL_DISPLAY_MAX_CENT = 3600;
+const SPIRAL_DISPLAY_RANGE = SPIRAL_DISPLAY_MAX_CENT - SPIRAL_DISPLAY_MIN_CENT;
+const SPIRAL_REPEAT_OFFSETS = [0, 1200, 2400];
+const DRAG_CONTINUITY_WINDOW = 90;
+
+let notes = [{ id: 0, cent: 0, isBase: true, playing: false }];
+let nextId = 1;
+let audioCtx = null;
+let stopRequested = false;
+let dragOsc = null;
+let dragGain = null;
+let dragging = null;
+let pendingAddOrViewDrag = null;
+let spiralRotX = -0.62;
+let spiralRotY = 0.68;
+
+const canvas = document.getElementById('spiralCanvas');
+const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+const statCount = document.getElementById('statCount');
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function centToFreq(cent) {
+  return BASE_FREQ * Math.pow(2, cent / 1200);
+}
+
+function playTone(cent, duration = 0.55, startTime = 0, volume = 0.22) {
+  const ctxAudio = getAudioCtx();
+  const t = startTime || ctxAudio.currentTime;
+  const osc = ctxAudio.createOscillator();
+  const gain = ctxAudio.createGain();
+
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(centToFreq(cent), t);
+  gain.gain.setValueAtTime(0, t);
+  gain.gain.linearRampToValueAtTime(volume, t + 0.012);
+  gain.gain.setValueAtTime(volume, t + duration * 0.55);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+
+  osc.connect(gain);
+  gain.connect(ctxAudio.destination);
+  osc.start(t);
+  osc.stop(t + duration + 0.02);
+}
+
+function startDragTone(cent) {
+  const ctxAudio = getAudioCtx();
+  stopDragTone();
+  dragOsc = ctxAudio.createOscillator();
+  dragGain = ctxAudio.createGain();
+  dragOsc.type = 'triangle';
+  dragOsc.frequency.setValueAtTime(centToFreq(cent), ctxAudio.currentTime);
+  dragGain.gain.setValueAtTime(0.001, ctxAudio.currentTime);
+  dragGain.gain.linearRampToValueAtTime(0.12, ctxAudio.currentTime + 0.02);
+  dragOsc.connect(dragGain);
+  dragGain.connect(ctxAudio.destination);
+  dragOsc.start(ctxAudio.currentTime);
+}
+
+function updateDragTone(cent) {
+  if (!dragOsc || !audioCtx) return;
+  dragOsc.frequency.setTargetAtTime(centToFreq(cent), audioCtx.currentTime, 0.01);
+}
+
+function stopDragTone() {
+  if (!dragOsc || !dragGain || !audioCtx) return;
+  const ctxAudio = audioCtx;
+  const osc = dragOsc;
+  const gain = dragGain;
+  gain.gain.cancelScheduledValues(ctxAudio.currentTime);
+  gain.gain.setValueAtTime(Math.max(gain.gain.value, 0.001), ctxAudio.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctxAudio.currentTime + 0.04);
+  osc.stop(ctxAudio.currentTime + 0.06);
+  dragOsc = null;
+  dragGain = null;
+}
+
+function resizeCanvas() {
+  // 枠を追加しても螺旋そのもののサイズは小さくしないように，表示エリア全体を基準にする
+  const section = document.querySelector('.spiral-section');
+  const size = Math.min(section.clientWidth - 80, section.clientHeight - 115, 880);
+  canvas.width = Math.max(320, size);
+  canvas.height = Math.max(320, size);
+  render();
+}
+
+function helixPoint3D(displayCent) {
+  const t = (displayCent - SPIRAL_DISPLAY_MIN_CENT) / SPIRAL_DISPLAY_RANGE;
+  const turn = displayCent / 1200;
+  const angle = turn * Math.PI * 2 - Math.PI / 2;
+  const radius = 0.62;
+  return {
+    x: Math.cos(angle) * radius,
+    y: -1.05 + t * 2.10,
+    z: Math.sin(angle) * radius,
+    t
+  };
+}
+
+function projectPoint(p) {
+  const cosY = Math.cos(spiralRotY);
+  const sinY = Math.sin(spiralRotY);
+  const x0 = p.x * cosY + p.z * sinY;
+  const z0 = -p.x * sinY + p.z * cosY;
+
+  const cosX = Math.cos(spiralRotX);
+  const sinX = Math.sin(spiralRotX);
+  const y1 = p.y * cosX - z0 * sinX;
+  const z1 = p.y * sinX + z0 * cosX;
+
+  const depth = 2.35 - z1;
+  const scale = 1.45 / depth;
+  const ndcX = x0 * scale;
+  const ndcY = y1 * scale;
+
+  return {
+    px: (ndcX * 0.5 + 0.5) * canvas.width,
+    py: (1 - (ndcY * 0.5 + 0.5)) * canvas.height,
+    depth,
+    t: p.t
+  };
+}
+
+function projectHelixPoint(displayCent) {
+  return projectPoint(helixPoint3D(displayCent));
+}
+
+function spiralClientToCent(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = (clientX - rect.left) * scaleX;
+  const y = (clientY - rect.top) * scaleY;
+  let bestCent = 0;
+  let bestDist = Infinity;
+
+  for (const offset of SPIRAL_REPEAT_OFFSETS) {
+    for (let c = MIN_CENT; c <= MAX_CENT; c += 2) {
+      const p = projectHelixPoint(c + offset);
+      const d = Math.hypot(x - p.px, y - p.py);
+      if (d < bestDist) {
+        bestDist = d;
+        bestCent = c;
+      }
+    }
+  }
+  return Math.max(MIN_CENT, Math.min(MAX_CENT, Math.round(bestCent)));
+}
+
+function spiralClientToCentNear(clientX, clientY, centerCent) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = (clientX - rect.left) * scaleX;
+  const y = (clientY - rect.top) * scaleY;
+
+  const minCent = Math.max(MIN_CENT, centerCent - DRAG_CONTINUITY_WINDOW);
+  const maxCent = Math.min(MAX_CENT, centerCent + DRAG_CONTINUITY_WINDOW);
+
+  let bestCent = centerCent;
+  let bestDist = Infinity;
+
+  for (const offset of SPIRAL_REPEAT_OFFSETS) {
+    for (let c = minCent; c <= maxCent; c += 1) {
+      const p = projectHelixPoint(c + offset);
+      const d = Math.hypot(x - p.px, y - p.py);
+      if (d < bestDist) {
+        bestDist = d;
+        bestCent = c;
+      }
+    }
+  }
+
+  return Math.max(MIN_CENT, Math.min(MAX_CENT, Math.round(bestCent)));
+}
+
+function findNoteAt(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = (clientX - rect.left) * scaleX;
+  const y = (clientY - rect.top) * scaleY;
+  let nearest = null;
+  let nearestDist = Infinity;
+
+  notes.forEach(note => {
+    SPIRAL_REPEAT_OFFSETS.forEach(offset => {
+      const p = projectHelixPoint(note.cent + offset);
+      const d = Math.hypot(x - p.px, y - p.py);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearest = note;
+      }
+    });
+  });
+  return nearestDist <= 26 ? nearest : null;
+}
+
+function drawPolyline(points, strokeStyle, lineWidth = 1) {
+  if (points.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(points[0].px, points[0].py);
+  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].px, points[i].py);
+  ctx.strokeStyle = strokeStyle;
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
+}
+
+function drawPoint(p, radius, fillStyle, glowRadius = 0, glowStyle = null) {
+  if (glowRadius > 0 && glowStyle) {
+    const grad = ctx.createRadialGradient(p.px, p.py, 0, p.px, p.py, glowRadius);
+    grad.addColorStop(0, glowStyle);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath();
+    ctx.arc(p.px, p.py, glowRadius, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.arc(p.px, p.py, radius, 0, Math.PI * 2);
+  ctx.fillStyle = fillStyle;
+  ctx.fill();
+}
+
+function drawGuideRing(displayCent) {
+  const center = helixPoint3D(displayCent);
+  const points = [];
+  const radius = 0.62;
+  for (let i = 0; i <= 128; i++) {
+    const angle = (i / 128) * Math.PI * 2;
+    points.push(projectPoint({
+      x: Math.cos(angle) * radius,
+      y: center.y,
+      z: Math.sin(angle) * radius,
+      t: (displayCent - SPIRAL_DISPLAY_MIN_CENT) / SPIRAL_DISPLAY_RANGE
+    }));
+  }
+  drawPolyline(points, 'rgba(170,170,170,0.055)', 1);
+}
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // 補助リングは1周ごとの区切りだけにして，螺旋構造の見通しを優先する
+  [0, 1200, 2400, 3600].forEach(drawGuideRing);
+
+  const spiral = [];
+  for (let c = SPIRAL_DISPLAY_MIN_CENT; c <= SPIRAL_DISPLAY_MAX_CENT; c += 4) {
+    spiral.push(projectHelixPoint(c));
+  }
+  drawPolyline(spiral, 'rgba(160,160,160,0.38)', 1.4);
+
+  // 600 cent の中間点は主張が強くなるため表示しない
+  // 1周ごとの目印だけを控えめに表示する
+  [0, 1200, 2400, 3600]
+    .map(c => projectHelixPoint(c))
+    .forEach((p, i) => {
+      const alpha = i === 0 ? 0.42 : 0.20;
+      drawPoint(p, i === 0 ? 4 : 3, `rgba(210,210,210,${alpha})`);
+    });
+
+
+  // 作成された音階は3周分に反復表示するが，周回が上がるほど少し薄くする
+  // 基準音は0 centだけを強く表示し，1周先・2周先は補助的なゴースト表示にする
+  SPIRAL_REPEAT_OFFSETS.forEach((offset, repeatIndex) => {
+    const noteAlpha = repeatIndex === 0 ? 0.92 : repeatIndex === 1 ? 0.52 : 0.32;
+    const glowAlpha = repeatIndex === 0 ? 0.10 : 0.04;
+
+    notes.forEach(note => {
+      const point = projectHelixPoint(note.cent + offset);
+
+      if (note.isBase) {
+        if (repeatIndex === 0) {
+          drawPoint(point, 6, 'rgba(170,170,170,0.96)', 18, 'rgba(220,220,220,0.10)');
+        } else {
+          drawPoint(point, 3, 'rgba(170,170,170,0.18)');
+        }
+        return;
+      }
+
+      drawPoint(point, 5, `rgba(215,215,215,${noteAlpha})`, 16, `rgba(220,220,220,${glowAlpha})`);
+    });
+  });
+
+  // 再生ハイライトは実際に鳴っている0〜1199 centの音だけに限定する
+  // 1周先・2周先の反復表示は構造確認用であり，再生対象としては強調しない
+  notes
+    .filter(n => n.playing)
+    .map(n => projectHelixPoint(n.cent))
+    .forEach(p => {
+      drawPoint(p, 7, 'rgba(245,245,245,0.96)', 22, 'rgba(255,255,255,0.12)');
+    });
+
+  statCount.textContent = notes.length;
+}
+
+function addNote(cent, shouldPlay = true) {
+  cent=Math.max(MIN_CENT, Math.min(MAX_CENT, Math.round(cent)));
+  const id = nextId++;
+  notes.push({ id, cent, playing: false });
+  notes.sort((a, b) => a.cent - b.cent);
+  render();
+  if (shouldPlay) playTone(cent);
+}
+
+function removeNote(id) {
+  const note = notes.find(n => n.id === id);
+  if (note && note.isBase) return;
+  notes = notes.filter(n => n.id !== id);
+  render();
+}
+
+function updateNoteCent(id, cent) {
+  const note = notes.find(n => n.id === id);
+  if (!note || note.isBase) return;
+  note.cent = Math.round(Math.max(MIN_CENT, Math.min(MAX_CENT, cent)));
+  notes.sort((a, b) => a.cent - b.cent);
+}
+
+function showTooltip(x, y, text) {
+  if (!SHOW_CENT_TOOLTIP) return;
+  tooltip.style.display = 'block';
+  tooltip.style.left = (x + 14) + 'px';
+  tooltip.style.top = (y - 10) + 'px';
+  tooltip.textContent = text;
+}
+
+function hideTooltip() { tooltip.style.display = 'none'; }
+
+canvas.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  const note = findNoteAt(e.clientX, e.clientY);
+
+  if (note && !note.isBase) {
+    dragging = {
+      id: note.id,
+      lastCent: note.cent
+    };
+    canvas.classList.add('dragging');
+    startDragTone(note.cent);
+    return;
+  }
+
+  if (note && note.isBase) {
+    playTone(note.cent);
+    return;
+  }
+
+  pendingAddOrViewDrag = {
+    startX: e.clientX,
+    startY: e.clientY,
+    lastX: e.clientX,
+    lastY: e.clientY,
+    cent: spiralClientToCent(e.clientX, e.clientY),
+    moved: false
+  };
+});
+
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const note = findNoteAt(e.clientX, e.clientY);
+  if (!note || note.isBase) return;
+  stopPlayback();
+  stopDragTone();
+  removeNote(note.id);
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (dragging) {
+    const cent = spiralClientToCentNear(e.clientX, e.clientY, dragging.lastCent);
+    dragging.lastCent = cent;
+
+    updateNoteCent(dragging.id, cent);
+    updateDragTone(cent);
+    render();
+    showTooltip(e.clientX, e.clientY, cent + ' ¢');
+    return;
+  }
+
+  if (pendingAddOrViewDrag) {
+    const dxFromStart = e.clientX - pendingAddOrViewDrag.startX;
+    const dyFromStart = e.clientY - pendingAddOrViewDrag.startY;
+    if (Math.hypot(dxFromStart, dyFromStart) > 4) {
+      pendingAddOrViewDrag.moved = true;
+      const dx = e.clientX - pendingAddOrViewDrag.lastX;
+      const dy = e.clientY - pendingAddOrViewDrag.lastY;
+      spiralRotY += dx * 0.012;
+      spiralRotX += dy * 0.008;
+      spiralRotX = Math.max(-1.25, Math.min(0.25, spiralRotX));
+      pendingAddOrViewDrag.lastX = e.clientX;
+      pendingAddOrViewDrag.lastY = e.clientY;
+      canvas.classList.add('dragging');
+      render();
+      hideTooltip();
+      return;
+    }
+  }
+
+  const note = findNoteAt(e.clientX, e.clientY);
+  if (note) showTooltip(e.clientX, e.clientY, note.cent + ' ¢');
+  else hideTooltip();
+});
+
+canvas.addEventListener('mouseleave', () => {
+  if (!dragging && !pendingAddOrViewDrag) hideTooltip();
+});
+
+canvas.addEventListener('auxclick', e => e.preventDefault());
+
+document.addEventListener('mouseup', () => {
+  if (dragging) {
+    stopDragTone();
+    dragging = null;
+    hideTooltip();
+    canvas.classList.remove('dragging');
+    notes.sort((a, b) => a.cent - b.cent);
+    render();
+  }
+
+  if (pendingAddOrViewDrag) {
+    if (!pendingAddOrViewDrag.moved) addNote(pendingAddOrViewDrag.cent, true);
+    pendingAddOrViewDrag = null;
+    canvas.classList.remove('dragging');
+  }
+});
+
+async function playScale(ascending) {
+  if (notes.length === 0) return;
+  stopRequested = false;
+  stopDragTone();
+  updateButtonsPlaying(true);
+  const playableNotes = notes.filter(n => n.isBase || n.cent < 1200);
+  const ordered = ascending
+    ? [...playableNotes].sort((a, b) => a.cent - b.cent)
+    : [...playableNotes].sort((a, b) => b.cent - a.cent);
+
+  for (let i = 0; i < ordered.length; i++) {
+    if (stopRequested) break;
+    notes.forEach(n => n.playing = false);
+    ordered[i].playing = true;
+    render();
+    playTone(ordered[i].cent, 0.5);
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  notes.forEach(n => n.playing = false);
+  render();
+  updateButtonsPlaying(false);
+}
+
+function stopPlayback() {
+  stopRequested = true;
+  stopDragTone();
+  notes.forEach(n => n.playing = false);
+  render();
+  updateButtonsPlaying(false);
+}
+
+function updateButtonsPlaying(isPlaying) {
+  document.getElementById('btnAsc').disabled = isPlaying;
+  document.getElementById('btnDesc').disabled = isPlaying;
+  document.getElementById('btnStop').disabled = !isPlaying;
+  document.getElementById('btnClear').disabled = isPlaying;
+  document.getElementById('btnFinish').disabled = isPlaying;
+}
+
+document.getElementById('btnAsc').addEventListener('click', () => playScale(true));
+document.getElementById('btnDesc').addEventListener('click', () => playScale(false));
+document.getElementById('btnStop').addEventListener('click', stopPlayback);
+
+document.getElementById('btnClear').addEventListener('click', () => {
+  const removableNotes = notes.filter(n => !n.isBase);
+  if (removableNotes.length === 0) return;
+  if (!confirm('基準音以外の全ての音を削除しますか？')) return;
+  stopPlayback();
+  stopDragTone();
+  notes = notes.filter(n => n.isBase);
+  render();
+});
+
+document.getElementById('btnFinish').addEventListener('click', () => {
+  stopPlayback();
+  stopDragTone();
+  const scaleData = [...notes]
+    .sort((a, b) => a.cent - b.cent)
+    .map((n, i) => ({
+      index: i + 1,
+      cent: n.cent,
+      frequency: Number(centToFreq(n.cent).toFixed(2)),
+      isBase: !!n.isBase
+    }));
+  console.log('=== 完成した音階 ===');
+  console.table(scaleData);
+  alert(`音階が完成しました。\n音数: ${notes.length} 個`);
+});
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+updateButtonsPlaying(false);
+document.addEventListener('pointerdown', () => getAudioCtx(), { once: true });
+</script>
+</body>
+</html>
