@@ -250,7 +250,8 @@
 (function() {
   const BASE_FREQ = 261.63;
   const MIN_CENTS = 0;
-  const MAX_CENTS = 1200;
+  const MAX_CENTS = 1199;
+  const MIN_ADDED_CENTS = 1;
 
   const SHOW_RINGS = false; // 開発時は true、実験時は false にする
 
@@ -311,9 +312,9 @@
     const distance = Math.sqrt(dx * dx + dy * dy);
     const maxRadius = Math.min(w, h) * RING_MAX_RATIO;
     const ratio = Math.min(distance / maxRadius, 1);
-    return MIN_CENTS + ratio * (MAX_CENTS - MIN_CENTS);
-
-}
+    const rawCents = MIN_CENTS + ratio * (MAX_CENTS - MIN_CENTS);
+    return Math.max(MIN_ADDED_CENTS, Math.min(MAX_CENTS, Math.round(rawCents)));
+  }
 
   function setupCanvasSize() {
     const area = exploreArea;
@@ -573,7 +574,10 @@ function drawBackgroundStar(px, py, r, color, glowColor, glowR) {
     lastSound = {
       normX: x / w,
       normY: y / h,
-      x, y, cents, freq,
+      x, y,
+      cents,
+      freq,
+      isBase: false,
       order: savedSounds.length
     };
 
@@ -636,7 +640,7 @@ function drawBackgroundStar(px, py, r, color, glowColor, glowR) {
     setButtonsPlayingState(true);
 
     const queue = includeBaseTone
-      ? [{ cents: MIN_CENTS, freq: BASE_FREQ, normX: 0.5, normY: 0.5, isBaseTone: true }, ...sounds]
+      ? [{ cents: MIN_CENTS, freq: BASE_FREQ, normX: 0.5, normY: 0.5, isBase: true, isBaseTone: true }, ...sounds]
       : sounds;
 
     let i = 0;
@@ -702,7 +706,7 @@ function drawBackgroundStar(px, py, r, color, glowColor, glowR) {
 
   document.getElementById('btn-play-desc').addEventListener('click', () => {
     const desc = [...savedSounds].sort((a, b) => b.cents - a.cents);
-    const baseTone = { cents: MIN_CENTS, freq: BASE_FREQ, normX: 0.5, normY: 0.5, isBaseTone: true };
+    const baseTone = { cents: MIN_CENTS, freq: BASE_FREQ, normX: 0.5, normY: 0.5, isBase: true, isBaseTone: true };
     playSoundsInSequence([...desc, baseTone], 0.65, false);
   });
 
@@ -729,12 +733,39 @@ function drawBackgroundStar(px, py, r, color, glowColor, glowR) {
 
   document.getElementById('btn-finish').addEventListener('click', () => {
     if (savedSounds.length === 0) return;
+
+    const scaleData = [
+      {
+        index: 1,
+        cent: MIN_CENTS,
+        frequency: Number(BASE_FREQ.toFixed(2)),
+        isBase: true
+      },
+      ...[...savedSounds]
+        .sort((a, b) => a.cents - b.cents)
+        .map((s, i) => ({
+          index: i + 2,
+          cent: s.cents,
+          frequency: Number(s.freq.toFixed(2)),
+          isBase: false
+        }))
+    ];
+
+    const rawUiData = savedSounds.map((s, i) => ({
+      order: i + 1,
+      normX: Number(s.normX.toFixed(4)),
+      normY: Number(s.normY.toFixed(4)),
+      x: Math.round(s.x),
+      y: Math.round(s.y),
+      cent: s.cents
+    }));
+
     document.getElementById('finish-count-text').textContent = `選んだ音：${savedSounds.length}個`;
     document.getElementById('finish-overlay').classList.add('show');
-    console.log('=== 完成した音の星座 ===');
-    savedSounds.forEach((s, i) => {
-      console.log(`音${i + 1}: x=${s.normX.toFixed(3)}, y=${s.normY.toFixed(3)}, cents=${s.cents.toFixed(1)}, freq=${s.freq.toFixed(2)}Hz, 保存順=${s.order + 1}`);
-    });
+    console.log('=== 完成した音階 ===');
+    console.table(scaleData);
+    console.log('=== UI固有データ ===');
+    console.table(rawUiData);
   });
 
   document.getElementById('btn-rehear').addEventListener('click', () => {

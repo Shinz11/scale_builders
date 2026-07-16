@@ -319,7 +319,7 @@
   <div class="left">
 
     <div class="pitch-section">
-      <div class="section-label">Pitch Space · 0 – 1200 cent</div>
+      <div class="section-label">Pitch Space</div>
       <div class="bar-wrapper" id="barWrapper">
         <div class="bar-track"></div>
         <div class="ticks" id="ticks"></div>
@@ -348,10 +348,14 @@
 
 <div id="tooltip"></div>
 
-<script>
+<script type="module">
+import { saveScaleSubmission } from './saveScale.js';
 // ─── State ───────────────────────────────────────────────────────────────────
 const BASE_FREQ = 261.63;
-const SHOW_CENT_TOOLTIP = true; // 開発時は true、実験時は false にする
+const MIN_CENT = 0;
+const MAX_CENT = 1199;
+const MIN_ADDED_CENT = 1;
+const SHOW_CENT_TOOLTIP = false; // 開発時は true、実験時は false にする
 let notes = [{ id: 0, cent: 0, isBase: true }]; // [{id, cent, isBase}]
 let nextId = 1;
 let audioCtx = null;
@@ -437,20 +441,12 @@ const ticksEl    = document.getElementById('ticks');
 function buildTicks() {
   ticksEl.innerHTML = '';
 
-  const visibleTicks = [0, 600, 1200];
-
-  visibleTicks.forEach(c => {
-    const pct = (c / 1200) * 100;
+  // 実験時は数値的な手がかりを出さないため，端点の小さな目印だけを表示する
+  [0, 100].forEach(pct => {
     const div = document.createElement('div');
     div.className = 'tick';
     div.style.left = pct + '%';
-
-    const label = (c === 0) ? '0' : (c === 1200 ? '1200' : 'mid');
-
-    div.innerHTML = `
-      <div class="tick-line major"></div>
-      <div class="tick-label">${label}</div>
-    `;
+    div.innerHTML = `<div class="tick-line major"></div>`;
     ticksEl.appendChild(div);
   });
 }
@@ -459,13 +455,14 @@ buildTicks();
 function barXToCent(x) {
   const rect = barWrapper.getBoundingClientRect();
   const pct = Math.max(0, Math.min(1, (x - rect.left) / rect.width));
-  return Math.round(pct * 1200);
+  return Math.round(pct * MAX_CENT);
 }
 
 // ─── Notes management ────────────────────────────────────────────────────────
 function addNote(cent, shouldPlay = true) {
+  cent = Math.max(MIN_ADDED_CENT, Math.min(MAX_CENT, Math.round(cent)));
   const id = nextId++;
-  notes.push({ id, cent });
+  notes.push({ id, cent, isBase: false });
   notes.sort((a, b) => a.cent - b.cent);
   render();
 
@@ -489,7 +486,7 @@ function removeNote(id) {
 
 function updateNoteCent(id, cent) {
   const n = notes.find(n => n.id === id);
-  if (n && !n.isBase) n.cent = Math.round(Math.max(0, Math.min(1200, cent)));
+  if (n && !n.isBase) n.cent = Math.max(MIN_ADDED_CENT, Math.min(MAX_CENT, Math.round(cent)));
   notes.sort((a, b) => a.cent - b.cent);
 }
 
@@ -536,11 +533,10 @@ function render() {
       removeNote(note.id);
     });
 
-    el.title = note.cent + ' cent';
     barWrapper.appendChild(el);
   });
 
-  document.getElementById('statCount').textContent = notes.length;
+  document.getElementById('statCount').textContent = notes.filter(n => !n.isBase).length;
 }
 
 // Global mouse events for drag
@@ -555,7 +551,6 @@ document.addEventListener('mousemove', e => {
   if (el) {
     const note = notes.find(n => n.id === dragging.id);
     el.style.left = (note.cent / 1200 * 100) + '%';
-    el.title = note.cent + ' cent';
   }
 
   const note = notes.find(n => n.id === dragging.id);
@@ -618,10 +613,6 @@ barWrapper.addEventListener('mousemove', e => {
 barWrapper.addEventListener('mouseleave', () => { if (!dragging) hideTooltip(); });
 
 // ─── Playback ─────────────────────────────────────────────────────────────────
-
-// ─── Playback ─────────────────────────────────────────────────────────────────
-
-// ─── Playback ─────────────────────────────────────────────────────────────────
 async function playScale(ascending) {
   if (notes.length === 0) return;
   stopRequested = false;
@@ -665,9 +656,11 @@ document.getElementById('btnClear').addEventListener('click', () => {
   }
 });
 
-document.getElementById('btnFinish').addEventListener('click', () => {
+document.getElementById('btnFinish').addEventListener('click', async () => {
   stopPlayback();
   stopDragTone();
+
+  const addedNoteCount = notes.filter(n => !n.isBase).length;
 
   const scaleData = [...notes]
     .sort((a, b) => a.cent - b.cent)
@@ -680,7 +673,23 @@ document.getElementById('btnFinish').addEventListener('click', () => {
 
   console.log('=== 完成した音階 ===');
   console.table(scaleData);
-  alert(`音階が完成しました。\n音数: ${notes.length} 個`);
+
+  try {
+    document.getElementById('btnFinish').disabled = true;
+
+    await saveScaleSubmission({
+      systemId: 'v1',
+      systemName: 'line',
+      notes: scaleData
+    });
+
+    alert(`音階を保存しました。\n音数: ${addedNoteCount} 個`);
+  } catch (error) {
+    console.error('保存に失敗しました:', error);
+    alert('保存に失敗しました。実験担当者に知らせてください。');
+  } finally {
+    document.getElementById('btnFinish').disabled = false;
+  }
 });
 
 // initial render

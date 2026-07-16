@@ -296,7 +296,7 @@
     リセット
   </button>
   <button class="btn btn-primary" id="btn-finish">完成</button>
-  <div class="note-count">ノード: <span id="node-count">1</span></div>
+  <div class="note-count">音数: <span id="node-count">0</span></div>
 </div>
 
 <footer>
@@ -306,11 +306,7 @@
   </div>
   <div class="hint">
     <svg class="hint-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="7" y1="1" x2="7" y2="13"/><polyline points="4,4 7,1 10,4"/><polyline points="4,10 7,13 10,10"/></svg>
-    上下ドラッグで音高を調整（1 cent単位）
-  </div>
-  <div class="hint">
-    <svg class="hint-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="5.5"/><line x1="7" y1="4.5" x2="7" y2="8"/><line x1="5.5" y1="8" x2="8.5" y2="8"/></svg>
-    縦軸: 0–1200 cent（12平均律1オクターブ相当）
+    上下ドラッグで音高を調整
   </div>
 </footer>
 
@@ -331,12 +327,13 @@
   let dragGain = null;
 
   const CENT_MIN = 0;
-  const CENT_MAX = 1200;
+  const CENT_MAX = 1199;
+  const MIN_ADDED_CENT = 1;
   const ROOT_HZ  = 261.63;
   const NOTE_DUR = 0.5; // seconds per note in sequence
   const SOLO_DUR = 0.55; // single note audition
   const NODE_X_GAP = 90; // ノードを左から順に並べる基本間隔
-  const SHOW_CENT_VALUES = true; // 開発時は true、実験時は false にする
+  const SHOW_CENT_VALUES = false; // 開発時は true、実験時は false にする
 
   /* ───────── DOM refs ───────── */
   const wrap    = document.getElementById('canvas-wrap');
@@ -439,7 +436,7 @@
   function yToCent(y) {
     const h = svgH();
     const raw = (1 - (y - PAD_Y) / (h - PAD_Y * 2)) * CENT_MAX;
-    return Math.round(Math.max(CENT_MIN, Math.min(CENT_MAX, raw)));
+    return Math.round(Math.max(MIN_ADDED_CENT, Math.min(CENT_MAX, raw)));
   }
   // Map node index → X pixel
   function idxToX(i, total) {
@@ -479,7 +476,9 @@
 
   function clampCentForIndex(cent, index) {
     const range = getAllowedCentRange(index);
-    return Math.max(range.min, Math.min(range.max, cent));
+    const min = Math.max(MIN_ADDED_CENT, range.min);
+    const max = Math.min(CENT_MAX, range.max);
+    return Math.round(Math.max(min, Math.min(max, cent)));
   }
 
   /* ───────── Catmull-Rom spline ───────── */
@@ -588,7 +587,7 @@
       svg.appendChild(circle);
     });
 
-    cntEl.textContent = nodes.length;
+    cntEl.textContent = nodes.filter(n => !n.isBase).length;
   }
 
   /* ───────── Tooltip ───────── */
@@ -622,7 +621,7 @@
     const insertIndex = getInsertIndexFromX(x);
     const cent = clampCentForIndex(rawCent, insertIndex);
 
-    nodes.splice(insertIndex, 0, { id: nextId++, cent, playing: false });
+    nodes.splice(insertIndex, 0, { id: nextId++, cent, isBase: false, playing: false });
     render();
     playTone(cent);
   });
@@ -658,7 +657,7 @@
     const dy = clientY - dragStartY;
     const h  = svgH() - PAD_Y * 2;
     const deltaCent = Math.round(-dy / h * CENT_MAX);
-    const rawCent = Math.max(CENT_MIN, Math.min(CENT_MAX, dragStartCent + deltaCent));
+    const rawCent = Math.max(MIN_ADDED_CENT, Math.min(CENT_MAX, dragStartCent + deltaCent));
     const nodeIndex = nodes.indexOf(dragNode);
     const newCent = clampCentForIndex(rawCent, nodeIndex);
     if (dragNode.cent !== newCent) {
@@ -760,11 +759,11 @@
         cent: n.cent,
         frequency: Number(centToHz(n.cent).toFixed(2)),
         isBase: !!n.isBase
-      }));　
+      }));
 
     console.log('=== 完成した音階 ===');
     console.table(scaleData);
-    alert(`音階が完成しました。\n音数: ${nodes.length} 個`);
+    alert(`音階が完成しました。\n音数: ${nodes.filter(n => !n.isBase).length} 個`);
   });
 
   /* ───────── Reset ───────── */

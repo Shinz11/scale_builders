@@ -244,7 +244,7 @@
 </div>
 
 <div class="status-bar">
-  <div class="status-item">音数: <span id="statCount">1</span></div>
+  <div class="status-item">音数: <span id="statCount">0</span></div>
   <div class="status-item">クリック → 音追加 · 音をドラッグ → 音高調整 · 枠内の空白をドラッグ → 螺旋を回転 · 右クリック → 削除</div>
 </div>
 
@@ -252,9 +252,10 @@
 
 <script>
 const BASE_FREQ = 261.63;
-const SHOW_CENT_TOOLTIP = true; // 開発時は true、実験時は false にする
+const SHOW_CENT_TOOLTIP = false; // 開発時は true、実験時は false にする
 const MIN_CENT = 0;
 const MAX_CENT = 1199;
+const MIN_ADDED_CENT = 1;
 const SPIRAL_DISPLAY_MIN_CENT = 0;
 const SPIRAL_DISPLAY_MAX_CENT = 3600;
 const SPIRAL_DISPLAY_RANGE = SPIRAL_DISPLAY_MAX_CENT - SPIRAL_DISPLAY_MIN_CENT;
@@ -553,13 +554,13 @@ function render() {
       drawPoint(p, 7, 'rgba(245,245,245,0.96)', 22, 'rgba(255,255,255,0.12)');
     });
 
-  statCount.textContent = notes.length;
+  statCount.textContent = notes.filter(n => !n.isBase).length;
 }
 
 function addNote(cent, shouldPlay = true) {
-  cent=Math.max(MIN_CENT, Math.min(MAX_CENT, Math.round(cent)));
+  cent = Math.max(MIN_ADDED_CENT, Math.min(MAX_CENT, Math.round(cent)));
   const id = nextId++;
-  notes.push({ id, cent, playing: false });
+  notes.push({ id, cent, isBase: false, playing: false });
   notes.sort((a, b) => a.cent - b.cent);
   render();
   if (shouldPlay) playTone(cent);
@@ -575,7 +576,7 @@ function removeNote(id) {
 function updateNoteCent(id, cent) {
   const note = notes.find(n => n.id === id);
   if (!note || note.isBase) return;
-  note.cent = Math.round(Math.max(MIN_CENT, Math.min(MAX_CENT, cent)));
+  note.cent = Math.max(MIN_ADDED_CENT, Math.min(MAX_CENT, Math.round(cent)));
   notes.sort((a, b) => a.cent - b.cent);
 }
 
@@ -754,7 +755,7 @@ document.getElementById('btnFinish').addEventListener('click', () => {
     }));
   console.log('=== 完成した音階 ===');
   console.table(scaleData);
-  alert(`音階が完成しました。\n音数: ${notes.length} 個`);
+  alert(`音階が完成しました。\n音数: ${notes.filter(n => !n.isBase).length} 個`);
 });
 
 window.addEventListener('resize', resizeCanvas);
