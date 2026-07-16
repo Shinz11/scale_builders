@@ -246,7 +246,8 @@
   </div>
 </div>
 
-<script>
+<script type="module">
+import { saveScaleSubmission } from './saveScale.js';
 (function() {
   const BASE_FREQ = 261.63;
   const MIN_CENTS = 0;
@@ -731,8 +732,10 @@ function drawBackgroundStar(px, py, r, color, glowColor, glowR) {
     drawSavedPoints();
   });
 
-  document.getElementById('btn-finish').addEventListener('click', () => {
+  document.getElementById('btn-finish').addEventListener('click', async () => {
     if (savedSounds.length === 0) return;
+
+    const addedNoteCount = savedSounds.length;
 
     const scaleData = [
       {
@@ -760,12 +763,29 @@ function drawBackgroundStar(px, py, r, color, glowColor, glowR) {
       cent: s.cents
     }));
 
-    document.getElementById('finish-count-text').textContent = `選んだ音：${savedSounds.length}個`;
-    document.getElementById('finish-overlay').classList.add('show');
     console.log('=== 完成した音階 ===');
     console.table(scaleData);
     console.log('=== UI固有データ ===');
     console.table(rawUiData);
+
+    try {
+      document.getElementById('btn-finish').disabled = true;
+
+      await saveScaleSubmission({
+        systemId: 'v2',
+        systemName: 'constellation',
+        notes: scaleData,
+        rawUiData
+      });
+
+      document.getElementById('finish-count-text').textContent = `選んだ音：${addedNoteCount}個`;
+      document.getElementById('finish-overlay').classList.add('show');
+    } catch (error) {
+      console.error('保存に失敗しました:', error);
+      alert('保存に失敗しました。実験担当者に知らせてください。');
+    } finally {
+      document.getElementById('btn-finish').disabled = false;
+    }
   });
 
   document.getElementById('btn-rehear').addEventListener('click', () => {
