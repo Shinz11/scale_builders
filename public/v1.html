@@ -264,110 +264,7 @@
 
   .spacer { flex: 1; }
 
-  /* info panel below bar */
-  .info-section {
-    padding: 18px 56px 24px;
-    overflow-y: auto;
-    max-height: 220px;
-    border-top: 1px solid var(--border);
-  }
 
-  .scale-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-  }
-
-  .scale-table th {
-    text-align: left;
-    color: var(--text-muted);
-    font-weight: 400;
-    letter-spacing: 0.2em;
-    padding: 0 12px 10px 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .scale-table td {
-    padding: 6px 12px 6px 0;
-    border-bottom: 1px solid rgba(35,40,64,0.4);
-    color: var(--text);
-    vertical-align: middle;
-  }
-
-  .scale-table tr:hover td {
-    color: var(--accent);
-    background: rgba(200,200,200,0.03);
-  }
-
-  .cent-value { color: var(--accent); }
-  .interval-value { color: var(--accent2); }
-
-  .play-note-btn {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    font-size: 10px;
-    padding: 3px 8px;
-    border-radius: 2px;
-    cursor: pointer;
-    font-family: 'Space Mono', monospace;
-    transition: all 0.1s;
-  }
-  .play-note-btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-
-  .del-btn {
-    background: none;
-    border: 1px solid transparent;
-    color: var(--text-muted);
-    font-size: 14px;
-    padding: 2px 6px;
-    border-radius: 2px;
-    cursor: pointer;
-    transition: all 0.1s;
-    line-height: 1;
-  }
-  .del-btn:hover {
-    border-color: var(--accent3);
-    color: var(--accent3);
-  }
-
-  /* ── Right panel: circle ── */
-  /* ── Visualization panel: circle ── */
-  .right {
-    width: 100%;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .circle-section {
-    min-height: 620px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 36px 40px 40px;
-    position: relative;
-  }
-
-  .circle-section .section-label {
-    position: absolute;
-    top: 24px;
-    left: 56px;
-  }
-
-  #circleCanvas {
-    display: block;
-    cursor: grab;
-    background: radial-gradient(circle at 50% 45%, rgba(255,255,255,0.035), rgba(255,255,255,0.006) 58%, transparent 72%);
-    border-radius: 18px;
-  }
-
-  #circleCanvas.dragging {
-    cursor: grabbing;
-  }
 
 
   /* status bar */
@@ -432,12 +329,6 @@
 
   </div>
 
-  <div class="right">
-    <div class="circle-section">
-      <div class="section-label">Circular View</div>
-      <canvas id="circleCanvas"></canvas>
-    </div>
-  </div>
 </div>
 
 <div class="controls">
@@ -449,10 +340,6 @@
   <button class="btn primary" id="btnFinish">完成</button>
 </div>
 
-<div class="info-section">
-  <div class="section-label">Scale Intervals</div>
-  <div id="scaleInfo"></div>
-</div>
 
 <div class="status-bar">
   <div class="status-item">音数: <span id="statCount">0</span></div>
@@ -608,7 +495,6 @@ function updateNoteCent(id, cent) {
 
 // ─── Render bar nodes ─────────────────────────────────────────────────────────
 let dragging = null;
-let circleDragging = null;
 
 function render() {
   // remove old nodes
@@ -654,45 +540,11 @@ function render() {
     barWrapper.appendChild(el);
   });
 
-  renderScaleInfo();
-  renderCircle();
   document.getElementById('statCount').textContent = notes.length;
 }
 
 // Global mouse events for drag
 document.addEventListener('mousemove', e => {
-  if (circleDragging) {
-    const newCent = circleClientToCent(e.clientX, e.clientY);
-    updateNoteCent(circleDragging.id, newCent);
-    updateDragTone(newCent);
-
-    const el = barWrapper.querySelector(`.note-node[data-id="${circleDragging.id}"]`);
-    if (el) {
-      const note = notes.find(n => n.id === circleDragging.id);
-      el.style.left = (note.cent / 1200 * 100) + '%';
-      el.title = note.cent + ' cent';
-    }
-
-    const note = notes.find(n => n.id === circleDragging.id);
-    if (note) showTooltip(e.clientX, e.clientY, note.cent + ' ¢');
-
-    renderScaleInfo();
-    renderCircle();
-    return;
-  }
-
-  if (spiralViewDragging) {
-    const dx = e.clientX - lastSpiralDragX;
-    const dy = e.clientY - lastSpiralDragY;
-    spiralRotY += dx * 0.012;
-    spiralRotX += dy * 0.008;
-    spiralRotX = Math.max(-1.25, Math.min(0.25, spiralRotX));
-    lastSpiralDragX = e.clientX;
-    lastSpiralDragY = e.clientY;
-    renderCircle();
-    return;
-  }
-
   if (!dragging) return;
 
   const newCent = barXToCent(e.clientX);
@@ -708,28 +560,9 @@ document.addEventListener('mousemove', e => {
 
   const note = notes.find(n => n.id === dragging.id);
   if (note) showTooltip(e.clientX, e.clientY, note.cent + ' ¢');
-
-  renderScaleInfo();
-  renderCircle();
 });
 
 document.addEventListener('mouseup', e => {
-  if (circleDragging){
-    stopDragTone();
-    circleDragging = null;
-    canvas.classList.remove('dragging');
-    hideTooltip();
-    notes.sort((a, b) => a.cent - b.cent);
-    render();
-    return;
-  }
-
-  if (spiralViewDragging) {
-    spiralViewDragging = false;
-    canvas.classList.remove('dragging');
-    return;
-  }
-
   if (!dragging) return;
   const dx = Math.abs(e.clientX - dragging.startX);
   if (dx < 3) {
@@ -756,16 +589,11 @@ barWrapper.addEventListener('mousedown', e => {
   //既存の音を掴んだ場合は，新規追加しない
   if (e.target.closest('.note-node')) return;
 
-  // Circular View 側のドラッグ中は，新規追加しない
-
-  if (typeof circleDragging !== 'undefined' && circleDragging) return;
-
   e.preventDefault();
 
   const cent = barXToCent(e.clientX);
 
   addNote(cent, true);
-
 });
 
 // ─── Tooltip ─────────────────────────────────────────────────────────────────
@@ -789,376 +617,9 @@ barWrapper.addEventListener('mousemove', e => {
 });
 barWrapper.addEventListener('mouseleave', () => { if (!dragging) hideTooltip(); });
 
-// ─── Scale info table ─────────────────────────────────────────────────────────
-function renderScaleInfo() {
-  const el = document.getElementById('scaleInfo');
-  if (notes.length === 0) {
-    el.innerHTML = '<div class="empty-hint">バー上をクリックして音を追加</div>';
-    return;
-  }
-  let html = `<table class="scale-table">
-    <thead><tr>
-      <th>#</th><th>Cent</th><th>Freq (Hz)</th><th>Δ Cent</th><th></th><th></th>
-    </tr></thead><tbody>`;
-  notes.forEach((n, i) => {
-    const freq = centToFreq(n.cent).toFixed(2);
-    const prev = i > 0 ? notes[i - 1] : null;
-    const delta = prev ? String(Math.round(n.cent - prev.cent)) : '—';
-    const deltaClass = prev ? 'interval-value' : '';
-    html += `<tr>
-      <td style="color:var(--text-muted)">${i + 1}</td>
-      <td class="cent-value">${n.cent}</td>
-      <td style="color:var(--text-dim)">${freq}</td>
-      <td class="${deltaClass}">${delta !== '—' ? '+' + delta : delta}</td>
-      <td><button class="play-note-btn" data-id="${n.id}">▶</button></td>
-      <td>${n.isBase ? '<span style="color:var(--text-muted)">基準</span>' : `<button class="del-btn" data-id="${n.id}" title="削除">×</button>`}</td>
-    </tr>`;
-  });
-  html += '</tbody></table>';
-  el.innerHTML = html;
+// ─── Playback ─────────────────────────────────────────────────────────────────
 
-  el.querySelectorAll('.play-note-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const note = notes.find(n => n.id == btn.dataset.id);
-      if (note) playTone(note.cent);
-    });
-  });
-  el.querySelectorAll('.del-btn').forEach(btn => {
-    btn.addEventListener('click', () => removeNote(+btn.dataset.id));
-  });
-}
-
-// ─── Circle canvas ────────────────────────────────────────────────────────────
-const canvas = document.getElementById('circleCanvas');
-const gl = canvas.getContext('webgl', { antialias: true, alpha: true });
-let spiralProgram = null;
-let spiralPositionBuffer = null;
-let spiralColorBuffer = null;
-let spiralRotX = -0.62;
-let spiralRotY = 0.68;
-let spiralViewDragging = false;
-let lastSpiralDragX = 0;
-let lastSpiralDragY = 0;
-
-function initSpiralWebGL() {
-  if (!gl || spiralProgram) return;
-
-  const vertexSrc = `
-    attribute vec2 a_position;
-    attribute vec4 a_color;
-    attribute float a_pointSize;
-    varying vec4 v_color;
-    void main() {
-      gl_Position = vec4(a_position, 0.0, 1.0);
-      gl_PointSize = a_pointSize;
-      v_color = a_color;
-    }
-  `;
-
-  const fragmentSrc = `
-    precision mediump float;
-    varying vec4 v_color;
-    void main() {
-      vec2 p = gl_PointCoord - vec2(0.5);
-      float d = length(p);
-      if (d > 0.5) discard;
-      gl_FragColor = v_color;
-    }
-  `;
-
-  const vs = createShader(gl.VERTEX_SHADER, vertexSrc);
-  const fs = createShader(gl.FRAGMENT_SHADER, fragmentSrc);
-  spiralProgram = createProgram(vs, fs);
-  spiralPositionBuffer = gl.createBuffer();
-  spiralColorBuffer = gl.createBuffer();
-}
-
-function createShader(type, source) {
-  const shader = gl.createShader(type);
-  gl.shaderSource(shader, source);
-  gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    console.error(gl.getShaderInfoLog(shader));
-    gl.deleteShader(shader);
-    return null;
-  }
-  return shader;
-}
-
-function createProgram(vs, fs) {
-  const program = gl.createProgram();
-  gl.attachShader(program, vs);
-  gl.attachShader(program, fs);
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    console.error(gl.getProgramInfoLog(program));
-    gl.deleteProgram(program);
-    return null;
-  }
-  return program;
-}
-
-function helixPoint3D(cent) {
-  const t = cent / 1200;
-  const angle = t * Math.PI * 2 - Math.PI / 2;
-  const radius = 0.62;
-  return {
-    x: Math.cos(angle) * radius,
-    // 0 cent / 基準音を下側に，1200 cent を上側に配置する
-    // 音階としての上昇が視覚的にも下から上へ見えるようにする
-    y: -0.78 + t * 1.56,
-    z: Math.sin(angle) * radius,
-    t
-  };
-}
-
-function projectHelixPoint(cent) {
-  return projectRawPoint(helixPoint3D(cent));
-}
-
-function projectRawPoint(p) {
-  const cosY = Math.cos(spiralRotY);
-  const sinY = Math.sin(spiralRotY);
-  const x0 = p.x * cosY + p.z * sinY;
-  const z0 = -p.x * sinY + p.z * cosY;
-
-  const cosX = Math.cos(spiralRotX);
-  const sinX = Math.sin(spiralRotX);
-  const y1 = p.y * cosX - z0 * sinX;
-  const z1 = p.y * sinX + z0 * cosX;
-
-  const depth = 2.35 - z1;
-  const scale = 1.45 / depth;
-
-  const ndcX = x0 * scale;
-  const ndcY = y1 * scale;
-
-  const px = (ndcX * 0.5 + 0.5) * canvas.width;
-  const py = (1 - (ndcY * 0.5 + 0.5)) * canvas.height;
-
-  return { ndcX, ndcY, px, py, depth, t: p.t };
-}
-
-function setWebGLViewport() {
-  gl.viewport(0, 0, canvas.width, canvas.height);
-  gl.clearColor(0, 0, 0, 0);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-}
-
-function drawWebGLPolyline(points, color) {
-  const positions = [];
-  const colors = [];
-  points.forEach(p => {
-    positions.push(p.ndcX, p.ndcY);
-    colors.push(color[0], color[1], color[2], color[3]);
-  });
-  drawWebGLGeometry(positions, colors, gl.LINE_STRIP, 1);
-}
-
-function drawVisibleSpiralLine(points) {
-  drawWebGLPolyline(points, [0.38, 0.38, 0.38, 0.34]);
-  drawWebGLPoints(points.filter((_, i) => i % 2 === 0), [0.72, 0.72, 0.72, 0.34], 4.5);
-  drawWebGLPoints(points.filter((_, i) => i % 5 === 0), [0.95, 0.95, 0.95, 0.42], 3.2);
-}
-
-function drawWebGLPoints(points, color, pointSize = 12) {
-  const positions = [];
-  const colors = [];
-  points.forEach(p => {
-    positions.push(p.ndcX, p.ndcY);
-    colors.push(color[0], color[1], color[2], color[3]);
-  });
-  drawWebGLGeometry(positions, colors, gl.POINTS, pointSize);
-}
-
-function drawGuideCircleAtCent(cent) {
-  const center = helixPoint3D(cent);
-  const points = [];
-  const radius = 0.62;
-
-  for (let i = 0; i <= 96; i++) {
-    const angle = (i / 96) * Math.PI * 2;
-    points.push(projectRawPoint({
-      x: Math.cos(angle) * radius,
-      y: center.y,
-      z: Math.sin(angle) * radius,
-      t: cent / 1200
-    }));
-  }
-
-  drawWebGLPolyline(points, [0.58, 0.58, 0.58, 0.11]);
-}
-
-function drawWebGLGeometry(positions, colors, mode, pointSize) {
-  if (!positions.length) return;
-
-  gl.useProgram(spiralProgram);
-
-  const posLoc = gl.getAttribLocation(spiralProgram, 'a_position');
-  const colorLoc = gl.getAttribLocation(spiralProgram, 'a_color');
-  const sizeLoc = gl.getAttribLocation(spiralProgram, 'a_pointSize');
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, spiralPositionBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(posLoc);
-  gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, spiralColorBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(colorLoc);
-  gl.vertexAttribPointer(colorLoc, 4, gl.FLOAT, false, 0, 0);
-
-  gl.vertexAttrib1f(sizeLoc, pointSize);
-  gl.drawArrays(mode, 0, positions.length / 2);
-}
-
-function resizeCanvas() {
-  const parent = canvas.parentElement;
-  const size = Math.min(parent.clientWidth - 80, parent.clientHeight - 80, 620);
-  canvas.width  = size;
-  canvas.height = size;
-  renderCircle();
-}
-
-function renderCircle() {
-  if (!gl) return;
-  initSpiralWebGL();
-  setWebGLViewport();
-
-  gl.enable(gl.BLEND);
-  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-  [0, 600, 1200].forEach(drawGuideCircleAtCent);
-
-  const spiral = [];
-  for (let c = 0; c <= 1200; c += 4) {
-    spiral.push(projectHelixPoint(c));
-  }
-
-  drawVisibleSpiralLine(spiral);
-
-  const guidePoints = [0, 600, 1200].map(c => projectHelixPoint(c));
-  drawWebGLPoints(guidePoints, [0.72, 0.72, 0.72, 0.58], 8);
-
-  if (notes.length === 0) return;
-
-  const notePoints = notes.map(n => projectHelixPoint(n.cent));
-
-  if (notes.length >= 2) {
-    const ordered = [...notes].sort((a, b) => a.cent - b.cent);
-    const orderedPoints = ordered.map(n => projectHelixPoint(n.cent));
-    drawWebGLPolyline(orderedPoints, [0.95, 0.95, 0.95, 0.42]);
-    drawWebGLPoints(orderedPoints, [0.95, 0.95, 0.95, 0.26], 5.5);
-  }
-
-  // 螺旋表示上の音高点は，近い音高同士が重なりすぎないように控えめなサイズで表示する
-  drawWebGLPoints(notePoints, [0.92, 0.92, 0.92, 0.16], 22);
-  drawWebGLPoints(notePoints, [0.82, 0.82, 0.82, 0.96], 10);
-
-  const playingPoints = notes
-    .filter(n => n.playing)
-    .map(n => projectHelixPoint(n.cent));
-
-  if (playingPoints.length > 0) {
-    // 再生中の音高は，通常点より少しだけ明るくして軽く示す
-    drawWebGLPoints(playingPoints, [1.0, 1.0, 1.0, 0.14], 25);
-    drawWebGLPoints(playingPoints, [0.96, 0.96, 0.96, 0.92], 12);
-  }
-}
-function getCircleGeometry() {
-  return {
-    cx: canvas.width / 2,
-    cy: canvas.height / 2,
-    R: Math.min(canvas.width, canvas.height) / 2 - 32
-  };
-}
-
-function circleClientToCent(clientX, clientY) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-
-  const x = (clientX - rect.left) * scaleX;
-  const y = (clientY - rect.top) * scaleY;
-
-  let bestCent = 0;
-  let bestDist = Infinity;
-
-  for (let c = 0; c <= 1200; c += 2) {
-    const p = projectHelixPoint(c);
-    const d = Math.hypot(x - p.px, y - p.py);
-    if (d < bestDist) {
-      bestDist = d;
-      bestCent = c;
-    }
-  }
-
-  return Math.round(bestCent);
-}
-
-function circleNotePosition(cent) {
-  const p = projectHelixPoint(cent);
-  return { x: p.px, y: p.py };
-}
-
-function findCircleNoteAt(clientX, clientY) {
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / rect.width;
-  const scaleY = canvas.height / rect.height;
-
-  const x = (clientX - rect.left) * scaleX;
-  const y = (clientY - rect.top) * scaleY;
-
-  let nearest = null;
-  let nearestDist = Infinity;
-
-  notes.forEach(note => {
-    const pos = circleNotePosition(note.cent);
-    const dist = Math.hypot(x - pos.x, y - pos.y);
-
-    if (dist < nearestDist) {
-      nearestDist = dist;
-      nearest = note;
-    }
-  });
-
-  return nearestDist <= 26 ? nearest : null;
-}
-
-canvas.addEventListener('mousedown', e => {
-  if (e.button !== 0) return;
-
-  const note = findCircleNoteAt(e.clientX, e.clientY);
-
-  e.preventDefault();
-  e.stopPropagation();
-
-  if (note && !note.isBase) {
-    circleDragging = { id: note.id };
-    canvas.classList.add('dragging');
-    startDragTone(note.cent);
-    return;
-  }
-
-  if (note && note.isBase) {
-    playTone(note.cent);
-    return;
-  }
-
-  spiralViewDragging = true;
-  lastSpiralDragX = e.clientX;
-  lastSpiralDragY = e.clientY;
-  canvas.classList.add('dragging');
-});
-
-canvas.addEventListener('dblclick', e => {
-  const cent = circleClientToCent(e.clientX, e.clientY);
-  addNote(cent, true);
-});
-
-
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
+// ─── Playback ─────────────────────────────────────────────────────────────────
 
 // ─── Playback ─────────────────────────────────────────────────────────────────
 async function playScale(ascending) {
