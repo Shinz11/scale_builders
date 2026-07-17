@@ -633,7 +633,7 @@ function drawBackgroundStar(px, py, r, color, glowColor, glowR) {
     drawSavedPoints();
   });
 
-  function playSoundsInSequence(sounds, gap = 0.65, includeBaseTone = true) {
+  function playSoundsInSequence(sounds, gap = 0.5, includeBaseTone = true) {
     if (isPlaying) return;
     if (!sounds.length && !includeBaseTone) return;
     initAudio();
@@ -708,7 +708,7 @@ function drawBackgroundStar(px, py, r, color, glowColor, glowR) {
   document.getElementById('btn-play-desc').addEventListener('click', () => {
     const desc = [...savedSounds].sort((a, b) => b.cents - a.cents);
     const baseTone = { cents: MIN_CENTS, freq: BASE_FREQ, normX: 0.5, normY: 0.5, isBase: true, isBaseTone: true };
-    playSoundsInSequence([...desc, baseTone], 0.65, false);
+    playSoundsInSequence([...desc, baseTone], 0.5, false);
   });
 
   document.getElementById('btn-undo').addEventListener('click', () => {

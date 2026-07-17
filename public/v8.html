@@ -542,7 +542,7 @@ async function playScale(ascending) {
     ordered[i].playing = true;
     render();
     playTone(ordered[i].cent, 0.5);
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 500));
   }
 
   notes.forEach(n => n.playing = false);
