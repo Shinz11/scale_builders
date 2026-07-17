@@ -221,7 +221,8 @@
 
 <div id="tooltip"></div>
 
-<script>
+<script type="module">
+import { saveScaleSubmission } from './saveScale.js';
 const BASE_FREQ = 261.63;
 const SHOW_CENT_TOOLTIP = false; // 開発時は true、実験時は false にする
 const MIN_CENT = 0;
@@ -579,9 +580,12 @@ document.getElementById('btnClear').addEventListener('click', () => {
   render();
 });
 
-document.getElementById('btnFinish').addEventListener('click', () => {
+document.getElementById('btnFinish').addEventListener('click', async () => {
   stopPlayback();
   stopDragTone();
+
+  const addedNoteCount = notes.filter(n => !n.isBase).length;
+
   const scaleData = [...notes]
     .sort((a, b) => a.cent - b.cent)
     .map((n, i) => ({
@@ -590,9 +594,26 @@ document.getElementById('btnFinish').addEventListener('click', () => {
       frequency: Number(centToFreq(n.cent).toFixed(2)),
       isBase: !!n.isBase
     }));
+
   console.log('=== 完成した音階 ===');
   console.table(scaleData);
-  alert(`音階が完成しました。\n音数: ${notes.filter(n => !n.isBase).length} 個`);
+
+  try {
+    document.getElementById('btnFinish').disabled = true;
+
+    await saveScaleSubmission({
+      systemId: 'v8',
+      systemName: 'circle',
+      notes: scaleData
+    });
+
+    alert(`音階を保存しました。\n音数: ${addedNoteCount} 個`);
+  } catch (error) {
+    console.error('保存に失敗しました:', error);
+    alert('保存に失敗しました。実験担当者に知らせてください。');
+  } finally {
+    document.getElementById('btnFinish').disabled = false;
+  }
 });
 
 window.addEventListener('resize', resizeCanvas);
