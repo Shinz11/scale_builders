@@ -219,7 +219,7 @@
 
 <header>
   <h1>Spiral Scale Builder</h1>
-  <span>音を螺旋上に配置するインタフェース</span>
+  <span>立方体の中に音を螺旋状に配置するインタフェース</span>
 </header>
 
 <div class="main">
@@ -228,7 +228,7 @@
     <div class="spiral-viewer">
       <canvas id="spiralCanvas"></canvas>
       <div class="viewer-caption">
-        <strong>枠内をドラッグ</strong>すると，螺旋構造をいろいろな角度から確認できます。
+        <strong>上に行くほど高い音</strong>になります。立方体内の螺旋上をクリックして音を追加できます。
       </div>
     </div>
   </div>
@@ -250,7 +250,8 @@
 
 <div id="tooltip"></div>
 
-<script>
+<script type="module">
+import { saveScaleSubmission } from './saveScale.js';
 const BASE_FREQ = 261.63;
 const SHOW_CENT_TOOLTIP = false; // 開発時は true、実験時は false にする
 const MIN_CENT = 0;
@@ -348,11 +349,15 @@ function resizeCanvas() {
   render();
 }
 
+
 function helixPoint3D(displayCent) {
   const t = (displayCent - SPIRAL_DISPLAY_MIN_CENT) / SPIRAL_DISPLAY_RANGE;
   const turn = displayCent / 1200;
   const angle = turn * Math.PI * 2 - Math.PI / 2;
+
+  // 純粋な螺旋構造に戻すため，半径は音高によらず一定にする。
   const radius = 0.62;
+
   return {
     x: Math.cos(angle) * radius,
     y: -1.05 + t * 2.10,
@@ -460,6 +465,7 @@ function findNoteAt(clientX, clientY) {
   return nearestDist <= 26 ? nearest : null;
 }
 
+
 function drawPolyline(points, strokeStyle, lineWidth = 1) {
   if (points.length < 2) return;
   ctx.beginPath();
@@ -468,6 +474,39 @@ function drawPolyline(points, strokeStyle, lineWidth = 1) {
   ctx.strokeStyle = strokeStyle;
   ctx.lineWidth = lineWidth;
   ctx.stroke();
+}
+
+function drawTube(points) {
+  if (points.length < 2) return;
+
+  // Canvas 2D上で，螺旋を細線ではなくチューブ状に見せるために，
+  // 太い半透明の外側，やや細い本体，中心のハイライトを重ねて描画する。
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].px, points[0].py);
+  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].px, points[i].py);
+  ctx.strokeStyle = 'rgba(230,230,230,0.055)';
+  ctx.lineWidth = 18;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].px, points[0].py);
+  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].px, points[i].py);
+  ctx.strokeStyle = 'rgba(190,190,190,0.22)';
+  ctx.lineWidth = 10;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].px, points[0].py);
+  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].px, points[i].py);
+  ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.lineCap = 'butt';
+  ctx.lineJoin = 'miter';
 }
 
 function drawPoint(p, radius, fillStyle, glowRadius = 0, glowStyle = null) {
@@ -490,6 +529,8 @@ function drawGuideRing(displayCent) {
   const center = helixPoint3D(displayCent);
   const points = [];
   const radius = 0.62;
+
+  // 1周ごとの高さを示す控えめな円形ガイド。
   for (let i = 0; i <= 128; i++) {
     const angle = (i / 128) * Math.PI * 2;
     points.push(projectPoint({
@@ -499,22 +540,49 @@ function drawGuideRing(displayCent) {
       t: (displayCent - SPIRAL_DISPLAY_MIN_CENT) / SPIRAL_DISPLAY_RANGE
     }));
   }
-  drawPolyline(points, 'rgba(170,170,170,0.055)', 1);
+  drawPolyline(points, 'rgba(170,170,170,0.045)', 1);
+}
+
+function drawCubeFrame() {
+  const x = 0.82;
+  const y = 1.12;
+  const z = 0.82;
+  const corners = [
+    { x: -x, y: -y, z: -z, t: 0 },
+    { x:  x, y: -y, z: -z, t: 0 },
+    { x:  x, y: -y, z:  z, t: 0 },
+    { x: -x, y: -y, z:  z, t: 0 },
+    { x: -x, y:  y, z: -z, t: 1 },
+    { x:  x, y:  y, z: -z, t: 1 },
+    { x:  x, y:  y, z:  z, t: 1 },
+    { x: -x, y:  y, z:  z, t: 1 }
+  ].map(projectPoint);
+
+  const edges = [
+    [0, 1], [1, 2], [2, 3], [3, 0],
+    [4, 5], [5, 6], [6, 7], [7, 4],
+    [0, 4], [1, 5], [2, 6], [3, 7]
+  ];
+
+  edges.forEach(([a, b]) => {
+    drawPolyline([corners[a], corners[b]], 'rgba(210,210,210,0.105)', 1.1);
+  });
 }
 
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  // 補助リングは1周ごとの区切りだけにして，螺旋構造の見通しを優先する
+  // 立方体フレームの中に螺旋を配置し，三次元空間として把握しやすくする
+  drawCubeFrame();
+  // 1周ごとの円形ガイドを控えめに表示し，上方向ほど音が高いことを見やすくする
   [0, 1200, 2400, 3600].forEach(drawGuideRing);
 
   const spiral = [];
   for (let c = SPIRAL_DISPLAY_MIN_CENT; c <= SPIRAL_DISPLAY_MAX_CENT; c += 4) {
     spiral.push(projectHelixPoint(c));
   }
-  drawPolyline(spiral, 'rgba(160,160,160,0.38)', 1.4);
+  drawTube(spiral);
 
-  // 600 cent の中間点は主張が強くなるため表示しない
-  // 1周ごとの目印だけを控えめに表示する
+  // 1オクターブごとの高さの目印を控えめに表示する
   [0, 1200, 2400, 3600]
     .map(c => projectHelixPoint(c))
     .forEach((p, i) => {
@@ -523,8 +591,8 @@ function render() {
     });
 
 
-  // 作成された音階は3周分に反復表示するが，周回が上がるほど少し薄くする
-  // 基準音は0 centだけを強く表示し，1周先・2周先は補助的なゴースト表示にする
+  // 作成された音階は立方体内の螺旋上に3周分反復表示するが，周回が上がるほど少し薄くする
+  // 基準音は0 centだけを強く表示し，上段の反復は補助的なゴースト表示にする
   SPIRAL_REPEAT_OFFSETS.forEach((offset, repeatIndex) => {
     const noteAlpha = repeatIndex === 0 ? 0.92 : repeatIndex === 1 ? 0.52 : 0.32;
     const glowAlpha = repeatIndex === 0 ? 0.10 : 0.04;
@@ -546,7 +614,7 @@ function render() {
   });
 
   // 再生ハイライトは実際に鳴っている0〜1199 centの音だけに限定する
-  // 1周先・2周先の反復表示は構造確認用であり，再生対象としては強調しない
+  // 上段の反復表示は構造確認用であり，再生対象としては強調しない
   notes
     .filter(n => n.playing)
     .map(n => projectHelixPoint(n.cent))
@@ -742,9 +810,12 @@ document.getElementById('btnClear').addEventListener('click', () => {
   render();
 });
 
-document.getElementById('btnFinish').addEventListener('click', () => {
+document.getElementById('btnFinish').addEventListener('click', async () => {
   stopPlayback();
   stopDragTone();
+
+  const addedNoteCount = notes.filter(n => !n.isBase).length;
+
   const scaleData = [...notes]
     .sort((a, b) => a.cent - b.cent)
     .map((n, i) => ({
@@ -753,9 +824,26 @@ document.getElementById('btnFinish').addEventListener('click', () => {
       frequency: Number(centToFreq(n.cent).toFixed(2)),
       isBase: !!n.isBase
     }));
+
   console.log('=== 完成した音階 ===');
   console.table(scaleData);
-  alert(`音階が完成しました。\n音数: ${notes.filter(n => !n.isBase).length} 個`);
+
+  try {
+    document.getElementById('btnFinish').disabled = true;
+
+    await saveScaleSubmission({
+      systemId: 'v7',
+      systemName: 'spiral-cube',
+      notes: scaleData
+    });
+
+    alert(`音階を保存しました。\n音数: ${addedNoteCount} 個`);
+  } catch (error) {
+    console.error('保存に失敗しました:', error);
+    alert('保存に失敗しました。実験担当者に知らせてください。');
+  } finally {
+    document.getElementById('btnFinish').disabled = false;
+  }
 });
 
 window.addEventListener('resize', resizeCanvas);
